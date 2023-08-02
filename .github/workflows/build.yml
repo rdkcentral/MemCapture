@@ -1,0 +1,23 @@
+name: MemCapture Build
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build MemCapture
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: Dependencies
+        run: |
+          sudo apt update -y -q
+          sudo apt install -q -y cmake build-essential
+
+      - name: build
+        run: |
+          cd $GITHUB_WORKSPACE
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc)
