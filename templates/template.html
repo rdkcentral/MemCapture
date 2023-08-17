@@ -205,16 +205,16 @@
                 <table class="table table-striped table-sm mt-3" id="tab{{ loop.index}}-table">
                     <thead>
                     <tr>
-                        {% for col in dataset.columns %}
-                        <th>{{ col }}</th>
+                        {% for item in dataset._columnOrder %}
+                            <th>{{ item }}</th>
                         {% endfor %}
                     </tr>
                     </thead>
                     <tbody>
-                    {% for row in dataset.rows %}
+                    {% for row in dataset.data %}
                     <tr>
-                        {% for col in row %}
-                        <td>{{ col }}</td>
+                        {% for item in objectToArray(row, dataset._columnOrder) %}
+                            <td>{{ item }}</td>
                         {% endfor %}
                     </tr>
                     {% endfor %}

@@ -2,7 +2,7 @@
 * If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
-* Copyright 2023 Stephen Foulds
+* Copyright 2023 Sky UK
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -33,39 +33,59 @@ JsonReportGenerator::JsonReportGenerator(std::shared_ptr<Metadata> metadata,
     mJson["grandTotal"]["calculatedUsage"] = 0.0;
 }
 
-void JsonReportGenerator::addDataset(const std::string &name, const std::vector<std::string> &columns,
-                                     const std::vector<row> &rows)
+void JsonReportGenerator::addDataset(const std::string &name, const std::vector<dataItems> &data)
 {
+    if (data.empty()) {
+        // no data, so no-op
+        return;
+    }
+
     nlohmann::json dataSet;
 
     dataSet["name"] = name;
-    dataSet["columns"] = columns;
+    dataSet["data"] = nlohmann::json::array();
+    dataSet["_columnOrder"] = nlohmann::json::array();
 
-    dataSet["rows"] = nlohmann::json::array();
+    bool setColumnOrder = false;
 
-    for (const auto &row: rows) {
-        nlohmann::json rowJson = nlohmann::json::array();
+    // Inja uses the unordered JSON format, and changing to ordered_json breaks things, see
+    // https://github.com/pantor/inja/pull/214. To work around this, add an array that defines the order
+    // of the columns. The _columnOrder array will also be responsible for generating the table headings
 
-        for (const auto &value: row) {
+    for (const auto& item : data) {
+        nlohmann::json tmp;
+
+        for (const auto& value : item) {
             std::visit(overload{
-                    [&](const std::string &value)
+                    [&](const std::pair<std::string, std::string> &v)
                     {
-                        rowJson.emplace_back(value);
+                        tmp[v.first] = v.second;
+
+                        if (!setColumnOrder) {
+                            dataSet["_columnOrder"].emplace_back(v.first);
+                        }
                     },
-                    [&](const Measurement &value)
+                    [&](const Measurement &v)
                     {
-                        rowJson.emplace_back(value.GetMinRounded());
-                        rowJson.emplace_back(value.GetMaxRounded());
-                        rowJson.emplace_back(value.GetAverageRounded());
+                        tmp[v.GetName()]["Min"] = v.GetMinRounded();
+                        tmp[v.GetName()]["Max"] = v.GetMaxRounded();
+                        tmp[v.GetName()]["Average"] = v.GetAverageRounded();
+
+                        if (!setColumnOrder) {
+                            dataSet["_columnOrder"].emplace_back(v.GetName() + " (Min)");
+                            dataSet["_columnOrder"].emplace_back(v.GetName() + " (Max)");
+                            dataSet["_columnOrder"].emplace_back(v.GetName() + " (Average)");
+                        }
                     }
             }, value);
         }
-
-        dataSet["rows"].emplace_back(rowJson);
+        dataSet["data"].emplace_back(tmp);
+        setColumnOrder = true;
     }
 
     mJson["data"].emplace_back(dataSet);
 }
+
 
 nlohmann::json JsonReportGenerator::getJson()
 {

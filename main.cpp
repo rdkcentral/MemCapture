@@ -2,7 +2,7 @@
 * If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
-* Copyright 2023 Stephen Foulds
+* Copyright 2023 Sky UK
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
 #include <csignal>
 #include <fstream>
 #include <optional>
-
+#include <filesystem>
 
 #include "Platform.h"
 #include "Log.h"
@@ -39,6 +39,7 @@
 
 #define INCBIN_STYLE INCBIN_STYLE_SNAKE
 #define INCBIN_PREFIX g_
+
 #include <incbin.h>
 
 #include "JsonReportGenerator.h"
@@ -79,7 +80,7 @@ static void parseArgs(const int argc, char **argv)
             {"duration",   required_argument, nullptr, (int) 'd'},
             {"platform",   required_argument, nullptr, (int) 'p'},
             {"output-dir", required_argument, nullptr, (int) 'o'},
-            {"json",       no_argument, nullptr, (int) 'j'},
+            {"json",       no_argument,       nullptr, (int) 'j'},
             {"groups",     required_argument, nullptr, (int) 'g'},
             {nullptr, 0,                      nullptr, 0}
     };
@@ -245,6 +246,43 @@ int main(int argc, char *argv[])
     // Make the output a bit tidier
     env.set_trim_blocks(true);
     env.set_lstrip_blocks(true);
+
+    // Convert the values in an object into an array that we can loop over (used for generating rows)
+    // Order the values using the _columnOrder data given in the second argument
+    env.add_callback("objectToArray", 2, [](inja::Arguments &args)
+    {
+        std::vector<nlohmann::json> values;
+
+        assert(args.at(0)->is_object());
+        assert(args.at(1)->is_array());
+
+        std::map<std::string, nlohmann::json> flattenedData;
+
+        // Flatten the data (one level deep only)
+        for (const auto &element: args.at(0)->items()) {
+            if (element.value().is_object()) {
+                // This is a very janky way to handle min/max/average & column ordering. The key name corresponds to "<Measurement Name> (Min/Max/Average)"
+                // which matches the _columnOrder values set in JsonReportGenerator
+                for (const auto &child: element.value().items()) {
+                    std::string keyName = element.key() + " (" + child.key() + ")";
+                    flattenedData.emplace(keyName, child.value());
+                }
+            } else {
+                values.emplace_back(element.value());
+                flattenedData.emplace(element.key(), element.value());
+            }
+        }
+
+        // Put the data into the order specified by _columnOrder
+        std::vector<nlohmann::json> ordered;
+        for (const auto& column : args.at(1)->items()) {
+            auto item = flattenedData.at(column.value());
+            ordered.emplace_back(item);
+        }
+
+        return ordered;
+    });
+
     auto htmlTemplateString = std::string(g_templateHtml_data, g_templateHtml_data + g_templateHtml_size);
     std::string result = env.render(htmlTemplateString, reportGenerator->getJson());
 

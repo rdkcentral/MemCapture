@@ -4,11 +4,28 @@ Memory capture and analysis tool for RDK
 
 ## Build
 
+### Dependencies
+MemCapture requires the following 3rd party libraries:
+
+* Nlohmann JSON
+* Inja
+
+For desktop builds, these can be installed using vcpkg. 
+
+The incbin library is also included as a header in the `3rdparty` directory.
+
+#### VCPKG Usage
+First, install VCPKG: https://vcpkg.io/en/getting-started.
+
+Then build the project using the below commands:
 ```shell
 $ mkdir build && cd ./build
-$ cmake -DCMAKE_BUILD_TYPE=Release ..
+$ cmake -DCMAKE_BUILD_TYPE=Release  -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake ..
 $ make -j$(nproc)
 ```
+
+#### Yocto
+For Yocto builds, ensure the nlohmann/json and inja libraries are added as recipe dependencies.
 
 ## Run
 

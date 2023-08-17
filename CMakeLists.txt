@@ -1,7 +1,7 @@
 # If not stated otherwise in this file or this component's LICENSE file the
 # following copyright and licenses apply:
 #
-# Copyright 2023 Stephen Foulds
+# Copyright 2023 Sky UK
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,9 @@ add_compile_options(-Wall -Wextra)
 
 find_package(Threads REQUIRED)
 find_package(Breakpad QUIET )
+
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(inja CONFIG REQUIRED)
 
 add_executable(${PROJECT_NAME}
         main.cpp
@@ -61,6 +64,8 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
         Threads::Threads
+        nlohmann_json::nlohmann_json
+        pantor::inja
         )
 
 if(BREAKPAD_FOUND)

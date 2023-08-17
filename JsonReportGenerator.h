@@ -2,7 +2,7 @@
 * If not stated otherwise in this file or this component's LICENSE file the
 * following copyright and licenses apply:
 *
-* Copyright 2023 Stephen Foulds
+* Copyright 2023 Sky UK
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -40,9 +40,11 @@ class JsonReportGenerator
 public:
     using row = std::vector<std::variant<std::string, Measurement>>;
 
+    using dataItems = std::vector<std::variant<std::pair<std::string, std::string>, Measurement>>;
+
     JsonReportGenerator(std::shared_ptr<Metadata> metadata, std::optional<std::shared_ptr<GroupManager>> groupManager);
 
-    void addDataset(const std::string &name, const std::vector<std::string> &columns, const std::vector<row> &rows);
+    void addDataset(const std::string& name, const std::vector<dataItems>& data);
 
     void addProcesses(std::vector<processMeasurement> &processes);
 
