@@ -1,0 +1,39 @@
+{
+  "containers": [
+    {
+      "group": "Apps",
+      "containers": [
+        "YouTube"
+      ]
+    }
+  ],
+  "processes": [
+    {
+      "group": "RDK - IARM Managers",
+      "processes": [
+        "controlMgr",
+        "dsMgrMain",
+        "deepSleepMgrMain",
+        "IARMDaemonMain",
+        "netsrvmgr"
+      ]
+    },
+    {
+      "group": "Logging",
+      "processes": [
+        "syslog-ng",
+        "systemd-journald"
+      ]
+    },
+    {
+      "group": "Linux Core OS",
+      "processes": [
+        "crond",
+        "dbus-daemon",
+        "init",
+        "systemd-udevd",
+        "systemd-timesyncd"
+      ]
+    }
+  ]
+}

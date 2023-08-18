@@ -1,0 +1,29 @@
+name: MemCapture Build
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build MemCapture
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: Dependencies
+        run: |
+          sudo apt update -y -q
+          sudo apt install -q -y cmake build-essential
+
+      - name: vcpkg install
+        run: |
+          git clone https://github.com/microsoft/vcpkg /opt/vcpkg
+          cd /opt/vcpkg
+          ./bootstrap-vcpkg.sh
+
+      - name: build
+        run: |
+          cd $GITHUB_WORKSPACE
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+          make -j$(nproc)

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MemCapture Report - {{ metadata.platform }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
+            crossorigin="anonymous"></script>
+
+    <link href="https://cdn.datatables.net/v/bs5/jq-3.7.0/jszip-3.10.1/dt-1.13.5/b-2.4.1/b-colvis-2.4.1/b-html5-2.4.1/sb-1.5.0/sp-2.2.0/datatables.min.css"
+          rel="stylesheet"/>
+    <script src="https://cdn.datatables.net/v/bs5/jq-3.7.0/jszip-3.10.1/dt-1.13.5/b-2.4.1/b-colvis-2.4.1/b-html5-2.4.1/sb-1.5.0/sp-2.2.0/datatables.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/chartjs-chart-error-bars@4"></script>
+    <style>
+        .process-table {
+            table-layout: fixed;
+            word-wrap: break-word;
+        }
+
+        .container {
+            max-width: 1800px;
+        }
+    </style>
+
+    <script>
+        $.fn.dataTable.Buttons.defaults.dom.button.className = 'btn';
+    </script>
+</head>
+<body>
+
+
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="exampleModalLabel">Process Memory</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <ul class="nav nav-tabs" id="graphTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="pss-top-20-tab" data-bs-toggle="tab"
+                                    data-bs-target="#pss-top-20-tab-pane" type="button" role="tab"
+                                    aria-controls="pss-top-20-tab-pane" aria-selected="true">Top 20 Processes (PSS)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pss-group-tab" data-bs-toggle="tab"
+                                    data-bs-target="#pss-group-tab-pane" type="button" role="tab"
+                                    aria-controls="pss-group-tab-pane" aria-selected="true">PSS Memory by Group
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="graphTabContent">
+                        <div class="tab-pane fade show active" id="pss-top-20-tab-pane" role="tabpanel"
+                             aria-labelledby="pss-top-20-tab" tabindex="0">
+                            <canvas id="pssChart"></canvas>
+                        </div>
+
+                        <div class="tab-pane fade" id="pss-group-tab-pane" role="tabpanel"
+                             aria-labelledby="pss-group-tab" tabindex="0">
+                            <canvas id="pssGroupChart"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="container my-4">
+    <div class="row my-3">
+        <div class="col-6">
+            <h2>
+                MemCapture Report - {{ metadata.platform }}
+            </h2>
+            <ul class="list-group">
+                <li class="list-group-item"><b>Image:</b> <code>{{ metadata.image }}</code></li>
+                <li class="list-group-item"><b>MAC:</b> <code>{{ metadata.mac }}</code></li>
+                <li class="list-group-item"><b>Report Time</b>: {{ metadata.timestamp }}</li>
+                <li class="list-group-item"><b>Capture Duration: </b> {{ metadata.duration }} seconds</li>
+                <li class="list-group-item"><b>Swap Enabled: </b> {{ metadata.swapEnabled }}</li>
+            </ul>
+        </div>
+        <div class="col-6">
+            <h2 class="title">Grand Totals (Average)</h2>
+            <ul class="list-group">
+                <li class="list-group-item list-group-item-primary"><b>Linux Reported Used:</b> {{ round(grandTotal.linuxUsage, 2) }} MB
+                </li>
+                <li class="list-group-item list-group-item-primary"><b>PSS + GPU + CMA (+ BMEM):</b> {{ round(grandTotal.calculatedUsage, 2) }} MB
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row my-3">
+        <div class="col">
+            <h3>
+                Processes
+            </h3>
+            <table id="processes" class="table table-striped table-sm process-table mt-2">
+                <thead>
+                <tr>
+                    <th style="max-width: 3rem;">PID</th>
+                    <th style="max-width: 3rem;"> PPID</th>
+                    <th>Process</th>
+                    <th style="max-width: 10rem;">Group</th>
+                    <th style="max-width: 10rem;">Systemd Service</th>
+                    <th style="max-width: 10rem;">Container</th>
+                    <th>Cmdline</th>
+                    <th style="max-width: 5rem;">RSS Min (KB)</th>
+                    <th style="max-width: 5rem;">RSS Max (KB)</th>
+                    <th style="max-width: 5rem;">RSS Avg (KB)</th>
+                    <th style="max-width: 5rem;">PSS Min (KB)</th>
+                    <th style="max-width: 5rem;">PSS Max (KB)</th>
+                    <th style="max-width: 5rem;">PSS Avg (KB)</th>
+                    <th style="max-width: 5rem;">USS Min (KB)</th>
+                    <th style="max-width: 5rem;">USS Max (KB)</th>
+                    <th style="max-width: 5rem;">USS Avg (KB)</th>
+                    {% if metadata.swapEnabled %}
+                        <th style="max-width: 5rem;">Swap Min (KB)</th>
+                        <th style="max-width: 5rem;">Swap Max (KB)</th>
+                        <th style="max-width: 5rem;">Swap Avg (KB)</th>
+                        <th style="max-width: 5rem;">Swap PSS Min (KB)</th>
+                        <th style="max-width: 5rem;">Swap PSS Max (KB)</th>
+                        <th style="max-width: 5rem;">Swap PSS Avg (KB)</th>
+                        <th style="max-width: 5rem;">ZRAM Swap Min (KB)</th>
+                        <th style="max-width: 5rem;">ZRAM Swap Max (KB)</th>
+                        <th style="max-width: 5rem;">ZRAM Swap Avg (KB)</th>
+                    {% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for p in processes %}
+                <tr>
+                    <td>{{ p.pid }}</td>
+                    <td>{{ p.ppid }}</td>
+                    <td style="word-wrap: break-word; min-width: 500px;">{{ p.name }}</td>
+                    <td>{{ p.group }}</td>
+                    <td>{{ p.systemdService }}</td>
+                    <td>{{ p.container }}</td>
+                    <td style="word-wrap: break-word; min-width: 500px;">{{ p.cmdline }}</td>
+                    <td>{{ p.rss.min }}</td>
+                    <td>{{ p.rss.max }}</td>
+                    <td>{{ p.rss.average }}</td>
+                    <td>{{ p.pss.min }}</td>
+                    <td>{{ p.pss.max }}</td>
+                    <td>{{ p.pss.average }}</td>
+                    <td>{{ p.uss.min }}</td>
+                    <td>{{ p.uss.max }}</td>
+                    <td>{{ p.uss.average }}</td>
+                    {% if metadata.swapEnabled %}
+                        <td>{{ p.swap.min }}</td>
+                        <td>{{ p.swap.max }}</td>
+                        <td>{{ p.swap.average }}</td>
+                        <td>{{ p.swapPss.min }}</td>
+                        <td>{{ p.swapPss.max }}</td>
+                        <td>{{ p.swapPss.average }}</td>
+                        <td>{{ p.swapZram.min }}</td>
+                        <td>{{ p.swapZram.max }}</td>
+                        <td>{{ p.swapZram.average }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row my-3">
+        <h3>
+            Memory Measurements
+        </h3>
+
+        <ul class="nav nav-tabs mt-2" id="myTab" role="tablist">
+            {% for dataset in data %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if loop.is_first %}active{% endif %}" id="tab{{ loop.index }}"
+                        data-bs-toggle="tab"
+                        data-bs-target="#tab{{ loop.index }}-pane"
+                        type="button" role="tab" aria-controls="tab{{ loop.index }}-pane" aria-selected="true">{{
+                    dataset.name }}
+                </button>
+            </li>
+            {% endfor %}
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            {% for dataset in data %}
+            <div class="tab-pane fade mt-3 {% if loop.is_first %}show active{% endif %}" id="tab{{ loop.index }}-pane"
+                 role="tabpanel"
+                 aria-labelledby="tab{{ loop.index }}" tabindex="0">
+                <table class="table table-striped table-sm mt-3" id="tab{{ loop.index}}-table">
+                    <thead>
+                    <tr>
+                        {% for item in dataset._columnOrder %}
+                            <th>{{ item }}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in dataset.data %}
+                    <tr>
+                        {% for item in objectToArray(row, dataset._columnOrder) %}
+                            <td>{{ item }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <script>
+                // @formatter:off
+                let tab{{ loop.index }}_table = $('#tab{{ loop.index }}-table').DataTable({
+                    buttons: [
+                        {
+                            extend: 'searchBuilder',
+                            text: 'Filter',
+                            className: "btn-secondary"
+                        }, {
+                            extend: 'copy',
+                            text: 'Copy to clipboard',
+                            className: "btn-secondary"
+                        }, {
+                            extend: 'excel',
+                            text: 'Export to Excel',
+                            className: "btn-secondary",
+                            filename: "MemCapture_{{ dataset.name }}_{{ metadata.image }}"
+                        }, {
+                            extend: 'colvis',
+                            text: 'Show/Hide Columns',
+                            className: "btn-secondary"
+                        }
+                    ],
+                    language: {
+                        searchBuilder: {
+                            button: 'Filter',
+                        }
+                    },
+                    paging: false,
+                    searching: false,
+                    dom: "<'row'<'col-sm-12 mb-3'B>>" +
+                        "<'row'<'col-sm-12'tr>>" +
+                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+                });
+                // @formatter:on
+            </script>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    // @formatter:off
+    let processTable = $('#processes').DataTable({
+        order: [[12, 'desc']],
+        buttons: [
+            {
+                extend: 'searchBuilder',
+                text: 'Filter',
+                className: "btn-secondary"
+            }, {
+                extend: 'copy',
+                text: 'Copy to clipboard',
+                className: "btn-secondary"
+            }, {
+                extend: 'excel',
+                text: 'Export to Excel',
+                className: "btn-secondary",
+                filename: "MemCapture_Processes_{{ metadata.image }}"
+            }, {
+                extend: 'colvis',
+                text: 'Show/Hide Columns',
+                className: "btn-secondary"
+            }, {
+                text: 'Show Graph',
+                className: "btn-primary",
+                action: function (e, dt, node, config) {
+                    const myModal = new bootstrap.Modal(document.getElementById('exampleModal'), {});
+                    myModal.show();
+                }
+            }
+        ],
+        language: {
+            searchBuilder: {
+                button: 'Filter',
+            }
+        },
+        columnDefs: [
+            {
+                {% if metadata.swapEnabled %}
+                    targets: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+                {% else %}
+                    targets: [7, 8, 9, 10, 11, 12, 13, 14, 15],
+                {% endif %}
+                    render: $.fn.dataTable.render.number(',', '.', 0, '')
+            },
+            {
+                {% if metadata.swapEnabled %}
+                    targets: [1, 6, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23],
+                {% else %}
+                    targets: [1, 6, 7, 8, 10, 11, 13, 14],
+                {% endif %}
+                visible: false
+            }
+        ],
+        dom: "<'row'<'col-sm-12 mb-3'B>>" +
+            "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+            "<'row'<'col-sm-12'tr>>" +
+            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+    });
+
+    const pssChartCtx = document.getElementById('pssChart');
+    const pssGroupChartCtx = document.getElementById('pssGroupChart');
+
+
+    new Chart(pssChartCtx, {
+        type: 'bar',
+        data: {
+            labels: [
+                {% for i in range(20) %}
+                    '{{ at(processes, i).name }}',
+                {% endfor %}
+             ],
+            datasets: [{
+                label: 'PSS Memory (KB)',
+                data: [
+                    {% for i in range(20) %}
+                            {% set p = at(processes, i) %}
+                            {{ p.pss.average }},
+                    {% endfor %}
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+
+    {% if isArray(pssByGroup) %}
+        new Chart(pssGroupChartCtx, {
+            type: 'pie',
+            data: {
+                labels: [
+                    {% for g in pssByGroup %}
+                        '{{ g.groupName }}',
+                    {% endfor %}
+                 ],
+                datasets: [{
+                    label: 'PSS Memory (KB)',
+                    data: [
+                        {% for g in pssByGroup %}
+                            '{{ g.pss }}',
+                        {% endfor %}
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {}
+        });
+    {% endif %}
+
+    //@formatter:on
+</script>
+</body>
+</html>
