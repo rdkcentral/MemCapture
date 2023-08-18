@@ -29,9 +29,9 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
         : mQuit(false),
           mCv(),
           mLinuxMemoryMeasurements{},
-          mCmaFree("Value (KB)"),
-          mCmaBorrowed("Value (KB)"),
-          mMemoryBandwidth("Memory Bandwidth (kbps)"),
+          mCmaFree("Value_KB"),
+          mCmaBorrowed("Value_KB"),
+          mMemoryBandwidth("Memory_Bandwidth_kbps"),
           mMemoryBandwidthSupported(false),
           mMemoryFragmentation{},
           mPlatform(platform),
@@ -79,7 +79,7 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
                                                    "Slab Total", "Slab Reclaimable", "Slab Unreclaimable", "Swap Used"};
 
     for (const auto& category : usageCategories) {
-        Measurement value("Value KB");
+        Measurement value("Value_KB");
         mLinuxMemoryMeasurements.insert(std::make_pair(category, value));
     }
 
@@ -222,7 +222,7 @@ void MemoryMetric::SaveResults()
     for (const auto &result: mCmaMeasurements) {
         data.emplace_back(JsonReportGenerator::dataItems{
                 std::make_pair("Region", result.first),
-                std::make_pair("Size KB", std::to_string(result.second.sizeKb)),
+                std::make_pair("Size_KB", std::to_string(result.second.sizeKb)),
                 result.second.Used,
                 result.second.Unused
         });
@@ -380,10 +380,10 @@ void MemoryMetric::GetCmaMemoryUsage()
                 measurement.Unused.AddDataPoint(unusedKb);
             } else {
                 // New CMA region, create measurements
-                auto used = Measurement("Used KB");
+                auto used = Measurement("Used_KB");
                 used.AddDataPoint(usedKb);
 
-                auto unused = Measurement("Unused KB");
+                auto unused = Measurement("Unused_KB");
                 unused.AddDataPoint(unusedKb);
 
                 auto measurement = cmaMeasurement(countKb, used, unused);
@@ -460,7 +460,7 @@ void MemoryMetric::GetContainerMemoryUsage()
                 auto &measurement = itr->second;
                 measurement.AddDataPoint(memoryUsageKb);
             } else {
-                Measurement measurement("Memory Used KB");
+                Measurement measurement("Memory_Used_KB");
                 measurement.AddDataPoint(memoryUsageKb);
                 mContainerMeasurements.insert(std::make_pair(containerName, measurement));
             }
@@ -524,7 +524,7 @@ void MemoryMetric::GetBroadcomBmemUsage()
 
             if (itr == mBroadcomBmemMeasurements.end()) {
                 // New region
-                Measurement measurement("Memory Usage (KB)");
+                Measurement measurement("Memory_Usage_KB");
                 measurement.AddDataPoint(usageKb);
                 mBroadcomBmemMeasurements.insert(std::make_pair(std::string(regionName), measurement));
             } else {
@@ -615,10 +615,10 @@ void MemoryMetric::CalculateFragmentation()
             } else {
                 std::vector<memoryFragmentation> measurements = {};
                 for (int i = 0; i < (int) freePages.size(); i++) {
-                    Measurement fp("Free Pages");
+                    Measurement fp("Free_Pages");
                     fp.AddDataPoint(freePages[i]);
 
-                    Measurement frag("Fragmentation %");
+                    Measurement frag("Fragmentation_%");
                     frag.AddDataPoint(fragmentationPercent[i]);
                     memoryFragmentation fragMeasurement(fp, frag);
                     measurements.emplace_back(fragMeasurement);
@@ -721,7 +721,7 @@ void MemoryMetric::GetGpuMemoryUsageBroadcom()
                         measurement.Used.AddDataPoint(virtualMemNumBytes / (long double) 1024.0);
                     } else {
                         Process process(pid);
-                        Measurement used("Memory Usage KB");
+                        Measurement used("Memory_Usage_KB");
                         used.AddDataPoint(virtualMemNumBytes / (long double) 1024.0);
 
                         auto measurement = gpuMeasurement(process, used);
@@ -773,7 +773,7 @@ void MemoryMetric::GetGpuMemoryUsageAmlogic()
             } else {
                 Process process(pid);
 
-                Measurement used("Memory Usage KB");
+                Measurement used("Memory_Usage_KB");
                 used.AddDataPoint(gpuBytes / (long double) 1024.0);
 
                 auto measurement = gpuMeasurement(process, used);
