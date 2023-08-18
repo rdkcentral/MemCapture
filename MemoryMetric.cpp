@@ -293,16 +293,16 @@ void MemoryMetric::SaveResults()
     if (mPlatform == Platform::BROADCOM) {
         for (const auto &measurement: mBroadcomBmemMeasurements) {
             data.emplace_back(JsonReportGenerator::dataItems{
-                    std::make_pair("Region", measurement.GetName()),
-                    measurement});
+                    std::make_pair("Region", measurement.first),
+                    measurement.second});
         }
         mReportGenerator->addDataset("BMEM", data);
 
         // Add all BMEM memory to accumulated total
         long double bmemSum = 0;
-        std::for_each(mBroadcomBmemMeasurements.begin(), mBroadcomBmemMeasurements.end(), [&](const Measurement &m)
+        std::for_each(mBroadcomBmemMeasurements.begin(), mBroadcomBmemMeasurements.end(), [&](const auto &m)
         {
-            bmemSum += m.GetAverage();
+            bmemSum += m.second.GetAverage();
         });
         mReportGenerator->addToAccumulatedMemoryUsage(bmemSum);
     }
@@ -520,19 +520,15 @@ void MemoryMetric::GetBroadcomBmemUsage()
             // Use KB for consistency with everything else
             double usageKb = (regionSize * (regionUsage / 100.0)) * 1024;
 
-            auto itr = std::find_if(mBroadcomBmemMeasurements.begin(), mBroadcomBmemMeasurements.end(),
-                                    [&](const Measurement &m)
-                                    {
-                                        return m.GetName() == std::string(regionName);
-                                    });
+            auto itr = mBroadcomBmemMeasurements.find(std::string(regionName));
 
             if (itr == mBroadcomBmemMeasurements.end()) {
                 // New region
-                Measurement measurement(regionName);
+                Measurement measurement("Memory Usage (KB)");
                 measurement.AddDataPoint(usageKb);
-                mBroadcomBmemMeasurements.emplace_back(measurement);
+                mBroadcomBmemMeasurements.insert(std::make_pair(std::string(regionName), measurement));
             } else {
-                auto &measurement = *itr;
+                auto &measurement = itr->second;
                 measurement.AddDataPoint(usageKb);
             }
         }
