@@ -90,18 +90,19 @@ std::string Metadata::Mac() const
     std::stringstream buffer;
     buffer << macFile.rdbuf();
 
-    return buffer.str();
+    std::string macStr = buffer.str();
+    // Remove trailing \n
+    macStr.erase(std::remove(macStr.begin(), macStr.end(), '\n'), macStr.cend());
+    return macStr;
 }
 
 std::string Metadata::ReportTimestamp() const
 {
-    auto t = std::time(nullptr);
-    auto tm = *std::localtime(&t);
+    std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::stringstream timeStream;
+    timeStream << std::put_time( std::localtime( &t ), "%FT%T%z" );
 
-    std::stringstream buffer;
-    buffer << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
-
-    return buffer.str();
+    return timeStream.str();
 }
 
 long Metadata::Duration() const

@@ -126,7 +126,7 @@ private:
     std::map<pid_t, gpuMeasurement> mGpuMeasurements;
     std::map<std::string, Measurement> mContainerMeasurements;
 
-    std::vector<Measurement> mBroadcomBmemMeasurements;
+    std::map<std::string, Measurement> mBroadcomBmemMeasurements;
 
     Measurement mCmaFree;
     Measurement mCmaBorrowed;

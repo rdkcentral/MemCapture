@@ -30,6 +30,7 @@
 #include "MemoryMetric.h"
 #include "Metadata.h"
 #include "GroupManager.h"
+#include "ConditionVariable.h"
 
 #include "inja/inja.hpp"
 
@@ -57,7 +58,7 @@ static bool gJson = false;
 bool gEnableGroups = false;
 static std::filesystem::path gGroupsFile;
 
-std::condition_variable gStop;
+ConditionVariable gStop;
 std::mutex gLock;
 bool gEarlyTermination = false;
 
@@ -283,21 +284,28 @@ int main(int argc, char *argv[])
         return ordered;
     });
 
-    auto htmlTemplateString = std::string(g_templateHtml_data, g_templateHtml_data + g_templateHtml_size);
-    std::string result = env.render(htmlTemplateString, reportGenerator->getJson());
-
-    std::filesystem::path htmlFilepath = gOutputDirectory / "report.html";
-    std::ofstream outputHtml(htmlFilepath, std::ios::trunc | std::ios::binary);
-    outputHtml << result;
-
-    LOG_INFO("Saved report to %s", htmlFilepath.string().c_str());
-
+    // Write the JSON first - this is safer and is the report automation need, so if we crash
+    // after this point we'll still get some data
     if (gJson) {
         std::filesystem::path jsonFilepath = gOutputDirectory / "report.json";
         std::ofstream outputJson(jsonFilepath, std::ios::trunc | std::ios::binary);
         outputJson << reportGenerator->getJson().dump(4);
 
         LOG_INFO("Saved JSON data to %s", jsonFilepath.string().c_str());
+    }
+
+    try {
+        auto htmlTemplateString = std::string(g_templateHtml_data, g_templateHtml_data + g_templateHtml_size);
+        std::string result = env.render(htmlTemplateString, reportGenerator->getJson());
+
+        std::filesystem::path htmlFilepath = gOutputDirectory / "report.html";
+        std::ofstream outputHtml(htmlFilepath, std::ios::trunc | std::ios::binary);
+        outputHtml << result;
+
+        LOG_INFO("Saved report to %s", htmlFilepath.string().c_str());
+    } catch (const std::exception& e) {
+        LOG_ERROR("Failed to save HTML report with exception %s", e.what());
+        throw;
     }
 
     return EXIT_SUCCESS;
