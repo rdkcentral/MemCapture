@@ -37,7 +37,7 @@ class MemoryMetric : public IMetric
 public:
     MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerator> reportGenerator);
 
-    ~MemoryMetric();
+    ~MemoryMetric() override;
 
     void StartCollection(std::chrono::seconds frequency) override;
 

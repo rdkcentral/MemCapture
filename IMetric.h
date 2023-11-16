@@ -28,6 +28,8 @@
 class IMetric
 {
 public:
+    virtual ~IMetric() = default;
+
     /**
      * @brief Start collecting data every X seconds and store the results in memory
      *

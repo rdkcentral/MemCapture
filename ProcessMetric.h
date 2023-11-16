@@ -32,9 +32,9 @@
 class ProcessMetric : public IMetric
 {
 public:
-    ProcessMetric(std::shared_ptr<JsonReportGenerator> reportGenerator);
+    explicit ProcessMetric(std::shared_ptr<JsonReportGenerator> reportGenerator);
 
-    ~ProcessMetric();
+    ~ProcessMetric() override;
 
     void StartCollection(std::chrono::seconds frequency) override;
 
