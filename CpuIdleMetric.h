@@ -16,25 +16,32 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
 #pragma once
 
+#ifdef ENABLE_CPU_IDLE_METRICS
+
 #include "IMetric.h"
+#include "JsonReportGenerator.h"
+#include <chrono>
+#include <memory>
 #include <thread>
 #include <condition_variable>
-#include <map>
 #include <mutex>
-#include <utility>
-#include "GroupManager.h"
-#include "JsonReportGenerator.h"
-#include "Procrank.h"
-#include "ProcessMeasurement.h"
+#include "Platform.h"
+#include <sys/prctl.h>
 
-class ProcessMetric : public IMetric
+/**
+ * @brief On supported platforms, retrieve the CPU idle metrics. Requires kernel patch.
+ *
+ * Only enabled when MemCapture built with ENABLE_CPU_IDLE_METRICS set
+ */
+class CpuIdleMetric : public IMetric
 {
 public:
-    explicit ProcessMetric(std::shared_ptr<JsonReportGenerator> reportGenerator);
+    CpuIdleMetric(std::shared_ptr<JsonReportGenerator> reportGenerator);
 
-    ~ProcessMetric() override;
+    ~CpuIdleMetric() override = default;
 
     void StartCollection(std::chrono::seconds frequency) override;
 
@@ -42,19 +49,10 @@ public:
 
     void SaveResults() override;
 
-
 private:
-    void CollectData(std::chrono::seconds frequency);
-
-    void DeduplicateData();
-
-private:
-    std::thread mCollectionThread;
-    bool mQuit;
-    std::condition_variable mCv;
-    std::mutex mLock;
-
-    std::vector<processMeasurement> mMeasurements;
-
     const std::shared_ptr<JsonReportGenerator> mReportGenerator;
+
+    IDLE_METRICS_V2 mIdleMetrics;
 };
+
+#endif

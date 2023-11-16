@@ -28,6 +28,10 @@
 #include "GroupManager.h"
 #include "Metadata.h"
 
+#ifdef ENABLE_CPU_IDLE_METRICS
+#include <sys/prctl.h>
+#endif
+
 template<class... Ts>
 struct overload : Ts ...
 {
@@ -47,6 +51,10 @@ public:
     void addDataset(const std::string& name, const std::vector<dataItems>& data);
 
     void addProcesses(std::vector<processMeasurement> &processes);
+
+#ifdef ENABLE_CPU_IDLE_METRICS
+    void addCpuIdleMetrics(const IDLE_METRICS_V2& metrics);
+#endif
 
     void setAverageLinuxMemoryUsage(int valueKb);
 

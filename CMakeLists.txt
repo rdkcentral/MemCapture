@@ -20,14 +20,14 @@ cmake_minimum_required(VERSION 3.10)
 project(MemCapture)
 
 # Add our local cmake directory to search for components
-set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake" )
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # The following disables an annoying warning "<blah> will change in GCC X.XX"
 add_compile_options(-Wno-psabi)
 add_compile_options(-Wall -Wextra)
 
 find_package(Threads REQUIRED)
-find_package(Breakpad QUIET )
+find_package(Breakpad QUIET)
 
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(inja CONFIG REQUIRED)
@@ -47,34 +47,40 @@ add_executable(${PROJECT_NAME}
 
         ProcessMetric.cpp
         MemoryMetric.cpp
-        )
+        CpuIdleMetric.cpp
+)
 
-set_property( SOURCE main.cpp
-        APPEND PROPERTY OBJECT_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/templates/template.html" )
+set_property(SOURCE main.cpp
+        APPEND PROPERTY OBJECT_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/templates/template.html")
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
         CXX_STANDARD 17
-        )
+)
 
 target_include_directories(${PROJECT_NAME}
         PRIVATE
         3rdparty
         .
-        )
+)
 
 target_link_libraries(${PROJECT_NAME}
         Threads::Threads
         nlohmann_json::nlohmann_json
         pantor::inja
-        )
+)
 
-if(BREAKPAD_FOUND)
-        message(STATUS "Enabling breakpad support")
-        add_definitions( -DUSE_BREAKPAD )
+if (BREAKPAD_FOUND)
+    message(STATUS "Enabling breakpad support")
+    add_definitions(-DUSE_BREAKPAD)
 
-        target_link_libraries(${PROJECT_NAME}
-                Breakpad::BreakpadWrapper
-        )
-else()
-        message(STATUS "Breakpad not found")
-endif()
+    target_link_libraries(${PROJECT_NAME}
+            Breakpad::BreakpadWrapper
+    )
+else ()
+    message(STATUS "Breakpad not found")
+endif ()
+
+option(ENABLE_CPU_IDLE_METRICS "Enable support for kernel-based AV metrics on supported platforms" OFF)
+if (ENABLE_CPU_IDLE_METRICS)
+    add_definitions(-DENABLE_CPU_IDLE_METRICS=1)
+endif ()

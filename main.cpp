@@ -32,6 +32,10 @@
 #include "GroupManager.h"
 #include "ConditionVariable.h"
 
+#ifdef ENABLE_CPU_IDLE_METRICS
+#include "CpuIdleMetric.h"
+#endif
+
 #include "inja/inja.hpp"
 
 #ifdef USE_BREAKPAD
@@ -54,6 +58,7 @@ static Platform gPlatform = Platform::AMLOGIC;
 static std::filesystem::path gOutputDirectory = std::filesystem::current_path() / "MemCaptureReport";
 
 static bool gJson = false;
+static bool gCpuIdle = false;
 
 bool gEnableGroups = false;
 static std::filesystem::path gGroupsFile;
@@ -72,6 +77,7 @@ static void displayUsage()
     printf("    -d, --duration      Amount of time (in seconds) to capture data for. Default 30 seconds\n");
     printf("    -p, --platform      Platform we're running on. Supported options = ['AMLOGIC', 'REALTEK', 'BROADCOM']. Defaults to Amlogic\n");
     printf("    -g, --groups        Path to JSON file containing the group mappings (optional)\n");
+    printf("    -c, --cpuidle       Enable CPU Idle metrics (default to false, requires kernel support)\n");
 }
 
 static void parseArgs(const int argc, char **argv)
@@ -83,6 +89,7 @@ static void parseArgs(const int argc, char **argv)
             {"output-dir", required_argument, nullptr, (int) 'o'},
             {"json",       no_argument,       nullptr, (int) 'j'},
             {"groups",     required_argument, nullptr, (int) 'g'},
+            {"cpuidle",     no_argument, nullptr, (int) 'c'},
             {nullptr, 0,                      nullptr, 0}
     };
 
@@ -91,7 +98,7 @@ static void parseArgs(const int argc, char **argv)
     int option;
     int longindex;
 
-    while ((option = getopt_long(argc, argv, "hd:p:o:jg:", longopts, &longindex)) != -1) {
+    while ((option = getopt_long(argc, argv, "hd:p:o:jg:c", longopts, &longindex)) != -1) {
         switch (option) {
             case 'h':
                 displayUsage();
@@ -130,6 +137,10 @@ static void parseArgs(const int argc, char **argv)
             case 'g': {
                 gEnableGroups = true;
                 gGroupsFile = std::filesystem::path(optarg);
+                break;
+            }
+            case 'c': {
+                gCpuIdle = true;
                 break;
             }
             case '?':
@@ -218,9 +229,22 @@ int main(int argc, char *argv[])
     ProcessMetric processMetric(reportGenerator);
     MemoryMetric memoryMetric(gPlatform, reportGenerator);
 
+#ifdef ENABLE_CPU_IDLE_METRICS
+    CpuIdleMetric cpuIdleMetric(reportGenerator);
+#endif
+
     // Start data collection
     processMetric.StartCollection(std::chrono::seconds(3));
     memoryMetric.StartCollection(std::chrono::seconds(3));
+
+    if (gCpuIdle) {
+#ifdef ENABLE_CPU_IDLE_METRICS
+        // The frequency does not affect this metric
+        cpuIdleMetric.StartCollection(std::chrono::seconds(0));
+#else
+        LOG_ERROR("Cannot retrieve CPU idle stats - not built with ENABLE_CPU_IDLE_METRICS set");
+#endif
+    }
 
     // Block main thread for the collection duration or until SIGTERM
     std::unique_lock<std::mutex> locker(gLock);
@@ -237,10 +261,20 @@ int main(int argc, char *argv[])
     // Done! Stop data collection
     processMetric.StopCollection();
     memoryMetric.StopCollection();
+#ifdef ENABLE_CPU_IDLE_METRICS
+    if (gCpuIdle) {
+        cpuIdleMetric.StopCollection();
+    }
+#endif
 
     // Save results
     processMetric.SaveResults();
     memoryMetric.SaveResults();
+#ifdef ENABLE_CPU_IDLE_METRICS
+    if (gCpuIdle) {
+        cpuIdleMetric.SaveResults();
+    }
+#endif
 
     // Build report
     inja::Environment env;
@@ -276,7 +310,7 @@ int main(int argc, char *argv[])
 
         // Put the data into the order specified by _columnOrder
         std::vector<nlohmann::json> ordered;
-        for (const auto& column : args.at(1)->items()) {
+        for (const auto &column: args.at(1)->items()) {
             auto item = flattenedData.at(column.value());
             ordered.emplace_back(item);
         }
@@ -303,7 +337,7 @@ int main(int argc, char *argv[])
         outputHtml << result;
 
         LOG_INFO("Saved report to %s", htmlFilepath.string().c_str());
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         LOG_ERROR("Failed to save HTML report with exception %s", e.what());
         throw;
     }
