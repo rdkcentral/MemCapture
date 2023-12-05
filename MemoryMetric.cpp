@@ -53,7 +53,7 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
                 std::make_pair("cma-3", "ion_cma_reserved"),
                 std::make_pair("cma-4", "vdin1_cma_reserved"),
                 std::make_pair("cma-5", "demod_cma_reserved"),
-                std::make_pair("cma-6", "kernel_reserved")
+                std::make_pair("cma-6", "kernel_reserved"),
         };
     } else if (platform == Platform::REALTEK) {
         mCmaNames = {
@@ -364,8 +364,8 @@ void MemoryMetric::GetCmaMemoryUsage()
                 cmaName = mCmaNames.at(dirEntry.path().filename());
             }
             catch (const std::exception &ex) {
-                LOG_ERROR("Could not find CMA name for directory %s", dirEntry.path().filename().string().c_str());
-                break;
+                LOG_DEBUG("Could not find friendly CMA name for directory %s", dirEntry.path().filename().string().c_str());
+                cmaName = dirEntry.path().filename();
             }
 
             // Add to measurements
