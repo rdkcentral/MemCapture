@@ -24,6 +24,7 @@
 #include <filesystem>
 #include <unistd.h>
 #include <cmath>
+#include <regex>
 
 MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerator> reportGenerator)
         : mQuit(false),
@@ -53,7 +54,7 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
                 std::make_pair("cma-3", "ion_cma_reserved"),
                 std::make_pair("cma-4", "vdin1_cma_reserved"),
                 std::make_pair("cma-5", "demod_cma_reserved"),
-                std::make_pair("cma-6", "kernel_reserved")
+                std::make_pair("cma-6", "kernel_reserved"),
         };
     } else if (platform == Platform::REALTEK) {
         mCmaNames = {
@@ -364,8 +365,8 @@ void MemoryMetric::GetCmaMemoryUsage()
                 cmaName = mCmaNames.at(dirEntry.path().filename());
             }
             catch (const std::exception &ex) {
-                LOG_ERROR("Could not find CMA name for directory %s", dirEntry.path().filename().string().c_str());
-                break;
+                LOG_WARN("Could not find friendly CMA name for directory %s", dirEntry.path().filename().string().c_str());
+                cmaName = dirEntry.path().filename();
             }
 
             // Add to measurements
@@ -431,8 +432,9 @@ void MemoryMetric::GetContainerMemoryUsage()
     //LOG_INFO("Getting Container memory usage");
 
     long double memoryUsageKb = 0;
-    // List of system containers which we are not interested in.
-    std::string ignore_list[] = {"init.scope", "system.slice"};
+
+    // List of systemd-created cgroups which we are not interested in.
+    static const std::regex ignoreRegex = std::regex("(init.scope)|(.*.slice)|(.*.mount)|(.*.scope)");
 
     std::string memoryCgroupDir = "/sys/fs/cgroup/memory";
 
@@ -449,7 +451,7 @@ void MemoryMetric::GetContainerMemoryUsage()
         }
 
         auto containerName = dirEntry.path().filename().string();
-        if (std::find(std::begin(ignore_list), std::end(ignore_list), containerName.c_str()) == std::end(ignore_list)) {
+        if (!std::regex_match(containerName, ignoreRegex)) {
             auto memoryUsageFile = std::ifstream(dirEntry.path() / "memory.usage_in_bytes");
             memoryUsageFile >> memoryUsageKb;
             memoryUsageKb /= (long double) 1024.0;
