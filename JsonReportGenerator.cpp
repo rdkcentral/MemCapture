@@ -209,7 +209,7 @@ void JsonReportGenerator::addCpuIdleMetrics(const IDLE_METRICS_V2 &metrics)
 
     // Per CPU stats
     unsigned long long idleTime = 0;
-    for (int i = 0; i < T962X3_NUM_CPUS; i++) {
+    for (int i = 0; i < NUM_CPUS; i++) {
         // Convert ns to s
         loadStats["cpu"][i]["idle"]["sum"] = metrics.idle[i].sum_idle_time / 1000000.0;
         loadStats["cpu"][i]["idle"]["percent"] = (float)((float)metrics.idle[i].sum_idle_time / (float)(totalRuntimeNs / 1000.0)) * 100;
@@ -225,7 +225,7 @@ void JsonReportGenerator::addCpuIdleMetrics(const IDLE_METRICS_V2 &metrics)
 
 
     // Load times
-    unsigned long run_time_lt_1ms_count = metrics.count - (metrics.run_time_gt_1ms + metrics.run_time_gt_5ms +
+    unsigned int run_time_lt_1ms_count = metrics.count - (metrics.run_time_gt_1ms + metrics.run_time_gt_5ms +
                                                             metrics.run_time_gt_10ms + metrics.run_time_gt_20ms +
                                                             metrics.run_time_gt_30ms + metrics.run_time_gt_40ms +
                                                             metrics.run_time_gt_50ms + metrics.run_time_gt_75ms +

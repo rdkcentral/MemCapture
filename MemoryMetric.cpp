@@ -56,6 +56,15 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
                 std::make_pair("cma-5", "demod_cma_reserved"),
                 std::make_pair("cma-6", "kernel_reserved"),
         };
+    } else if (platform == Platform::AMLOGIC_950D4) {
+        mCmaNames = {
+                std::make_pair("cma-linux,secmo", "secmon_reserved"),
+                std::make_pair("cma-reserved", "reserved"),
+                std::make_pair("cma-linux,codec", "codec_mm_cma"),
+                std::make_pair("cma-linux,ion-d", "ion_cma_reserved"),
+                std::make_pair("cma-linux,vdin1", "vdin1_cma_reserved"),
+                std::make_pair("cma-linux,meson", "kernel_reserved")
+        };
     } else if (platform == Platform::REALTEK) {
         mCmaNames = {
                 std::make_pair("cma-0", "cma-0"),
@@ -67,6 +76,18 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
                 std::make_pair("cma-6", "cma-6"),
                 std::make_pair("cma-7", "cma-7"),
                 std::make_pair("cma-8", "cma-8"),
+        };
+    } else if (platform == Platform::REALTEK64) {
+        mCmaNames = {
+                std::make_pair("cma-linux,defau", "default_dma_pool"),
+                std::make_pair("cma-linux,cma_1", "video_output_pool_2"),
+                std::make_pair("cma-linux,cma_3", "audio_pool"),
+                std::make_pair("cma-linux,cma_4", "svp_video_pool"),
+                std::make_pair("cma-linux,cma_5", "audio_output_pool"),
+                std::make_pair("cma-linux,cma_6", "ota_pool"),
+                std::make_pair("cma-linux,cma_7", "audio_fw_pool"),
+                std::make_pair("cma-linux,cma_8", "audio_hifi_pool"),
+                std::make_pair("cma-linux,cma_9", "video_output_pool_1"),
         };
     } else if (platform == Platform::BROADCOM) {
         mCmaNames = {
@@ -85,7 +106,9 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
     }
 
     switch (platform) {
-        case Platform::AMLOGIC: {
+        case Platform::AMLOGIC: 
+        case Platform::AMLOGIC_950D4: 
+        {
             // Amlogic should allow reporting memory bandwidth
             if (std::filesystem::exists("/sys/class/aml_ddr/mode")) {
                 mMemoryBandwidthSupported = true;
@@ -99,6 +122,7 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
         }
 
         case Platform::REALTEK:
+        case Platform::REALTEK64:
             // Realtek does not report memory bandwidth
             mMemoryBandwidthSupported = false;
             // Realtek reports GPU memory allocations
@@ -365,7 +389,7 @@ void MemoryMetric::GetCmaMemoryUsage()
                 cmaName = mCmaNames.at(dirEntry.path().filename());
             }
             catch (const std::exception &ex) {
-                LOG_WARN("Could not find friendly CMA name for directory %s", dirEntry.path().filename().string().c_str());
+                LOG_WARN("Could not find CMA name for directory %s, path=%s, cmaName=%s", dirEntry.path().filename().string().c_str(), dirEntry.path().string().c_str(), cmaName.c_str());
                 cmaName = dirEntry.path().filename();
             }
 
@@ -411,11 +435,15 @@ void MemoryMetric::GetGpuMemoryUsage()
         //LOG_INFO("Getting GPU memory usage");
 
         switch (mPlatform) {
-            case (Platform::AMLOGIC): {
+            case (Platform::AMLOGIC): 
+            case (Platform::AMLOGIC_950D4): 
+            {
                 GetGpuMemoryUsageAmlogic();
                 break;
             }
-            case (Platform::REALTEK): {
+            case (Platform::REALTEK): 
+            case (Platform::REALTEK64): 
+	    {
                 GetGpuMemoryUsageRealtek();
                 break;
             }
@@ -476,7 +504,7 @@ void MemoryMetric::GetMemoryBandwidth()
     if (mMemoryBandwidthSupported) {
         //LOG_INFO("Getting memory bandwidth usage");
 
-        if (mPlatform == Platform::AMLOGIC) {
+        if (mPlatform == Platform::AMLOGIC || mPlatform == Platform::AMLOGIC_950D4) {
             std::ifstream memBandwidthFile("/sys/class/aml_ddr/bandwidth");
 
             if (!memBandwidthFile) {
@@ -567,10 +595,13 @@ void MemoryMetric::CalculateFragmentation()
         std::map<int, double> fragmentationPercent;
 
         size_t columnCount = 0;
-        if (mPlatform == Platform::AMLOGIC) {
+        if (mPlatform == Platform::AMLOGIC || mPlatform == Platform::AMLOGIC_950D4) {
             columnCount = 15;
         } else if (mPlatform == Platform::REALTEK) {
             columnCount = 17;
+        } else if (mPlatform == Platform::REALTEK64) {
+		/* ES1 has 15 columns */
+            columnCount = 15;
         } else if (mPlatform == Platform::BROADCOM) {
             columnCount = 15;
         }
