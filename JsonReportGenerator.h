@@ -30,6 +30,11 @@
 
 #ifdef ENABLE_CPU_IDLE_METRICS
 #include <sys/prctl.h>
+/* this is required until amlogic idle metrics has been updated with 32/64bit compatibilities */
+#ifndef NUM_CPUS
+#define NUM_CPUS	4
+#endif
+
 #endif
 
 template<class... Ts>

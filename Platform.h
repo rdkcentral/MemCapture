@@ -22,6 +22,8 @@
 enum class Platform
 {
     AMLOGIC,
+    AMLOGIC_950D4,
     REALTEK,
+    REALTEK64,
     BROADCOM
 };
