@@ -30,6 +30,7 @@
 
 #include "Procrank.h"
 #include "JsonReportGenerator.h"
+#include "FileParsers/ZRAM.h"
 
 
 class MemoryMetric : public IMetric
@@ -70,6 +71,8 @@ private:
     void GetGpuMemoryUsageMediatek();
 
     void GetGpuMemoryUsageRealtek();
+
+    void GetZramMetrics();
 
     pid_t tidToParentPid(pid_t tid);
 
@@ -116,6 +119,20 @@ private:
         Measurement Used;
     };
 
+    struct zramMeasurement 
+    {
+        zramMeasurement(Measurement &_origDataSize, Measurement &_comprDataSize, Measurement &_memUsedTotal)
+            : OrigDataSize(std::move(_origDataSize)), 
+              ComprDataSize(std::move(_comprDataSize)), 
+              MemUsedTotal(std::move(_memUsedTotal))
+        {
+        }
+
+        Measurement OrigDataSize;
+        Measurement ComprDataSize;
+        Measurement MemUsedTotal;
+    };
+
     std::thread mCollectionThread;
     bool mQuit;
     std::condition_variable mCv;
@@ -145,4 +162,8 @@ private:
     std::map<std::string, std::string> mCmaNames;
 
     std::shared_ptr<JsonReportGenerator> mReportGenerator;
+
+    ZRAM mZRAM;
+    bool mZRAMSupported;
+    std::map<std::string, zramMeasurement> mZramMeasurements;
 };

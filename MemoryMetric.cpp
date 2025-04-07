@@ -36,7 +36,8 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
           mMemoryBandwidthSupported(false),
           mMemoryFragmentation{},
           mPlatform(platform),
-          mReportGenerator(std::move(reportGenerator))
+          mReportGenerator(std::move(reportGenerator)),
+          mZRAMSupported(false)
 {
 
     // Some metrics are returned as a number of pages instead of bytes, so get page size to be able to calculate
@@ -148,6 +149,7 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
             break;
     }
 
+    mZRAMSupported = mZRAM.hasZRAM();
 }
 
 MemoryMetric::~MemoryMetric()
@@ -196,6 +198,10 @@ void MemoryMetric::CollectData(std::chrono::seconds frequency)
 
         if (mPlatform == Platform::BROADCOM) {
             GetBroadcomBmemUsage();
+        }
+
+        if (mZRAMSupported) {
+            GetZramMetrics();
         }
 
         auto end = std::chrono::high_resolution_clock::now();
@@ -333,6 +339,7 @@ void MemoryMetric::SaveResults()
                     measurement.second});
         }
         mReportGenerator->addDataset("BMEM", data);
+        data.clear();
 
         // Add all BMEM memory to accumulated total
         long double bmemSum = 0;
@@ -341,6 +348,15 @@ void MemoryMetric::SaveResults()
             bmemSum += m.second.GetAverage();
         });
         mReportGenerator->addToAccumulatedMemoryUsage(bmemSum);
+    }
+
+    if (mZRAMSupported) {
+        for (const auto &result : mZramMeasurements) {
+            data.emplace_back(JsonReportGenerator::dataItems{std::make_pair("Name", result.first), result.second.OrigDataSize, result.second.ComprDataSize,
+                                                             result.second.MemUsedTotal});
+        }
+        mReportGenerator->addDataset("zram", data);
+        data.clear();
     }
 }
 
@@ -955,4 +971,34 @@ pid_t MemoryMetric::tidToParentPid(pid_t tid)
 
     // Failed to find Tgid in file, weird?
     return -1;
+}
+
+void MemoryMetric::GetZramMetrics()
+{
+    if (!mZRAMSupported) {
+        return;
+    }
+
+    std::vector<ZRAMDeviceStats> devStats = mZRAM.GetDeviceStats();
+
+    for (const auto& dev : devStats) {
+        auto itr = mZramMeasurements.find(dev.device_name);
+        if (itr == mZramMeasurements.end()) {
+            Measurement origSize("Data_Used_MB");
+            origSize.AddDataPoint(dev.orig_data_size);
+
+            Measurement compSize("Compressed_Data_MB");
+            compSize.AddDataPoint(dev.compr_data_size);
+
+            Measurement memUsed("Total_Memory_MB");
+            memUsed.AddDataPoint(dev.mem_used_total);
+
+            mZramMeasurements.insert(std::make_pair(dev.device_name, 
+                                    zramMeasurement(origSize, compSize, memUsed)));
+        } else {
+            itr->second.OrigDataSize.AddDataPoint(dev.orig_data_size);
+            itr->second.ComprDataSize.AddDataPoint(dev.compr_data_size);
+            itr->second.MemUsedTotal.AddDataPoint(dev.mem_used_total);
+        }
+    }
 }

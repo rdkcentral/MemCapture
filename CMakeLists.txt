@@ -42,6 +42,7 @@ add_executable(${PROJECT_NAME}
 
         FileParsers/MemInfo.cpp
         FileParsers/Smaps.cpp
+        FileParsers/ZRAM.cpp
 
         JsonReportGenerator.cpp
 
