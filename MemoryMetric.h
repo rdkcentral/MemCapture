@@ -74,6 +74,8 @@ private:
 
     void GetZramMetrics();
 
+    void GetCgroupMetrics(const std::string &cgroupType);
+
     pid_t tidToParentPid(pid_t tid);
 
 private:
@@ -133,6 +135,21 @@ private:
         Measurement MemUsedTotal;
     };
 
+    struct cgroupMeasurement
+    {
+        cgroupMeasurement(Measurement &_failcnt, Measurement &_usedKB, Measurement &_limitKB)
+                : FailCnt(std::move(_failcnt)),
+                  UsedKB(std::move(_usedKB)),
+                  LimitKB(std::move(_limitKB))
+        {
+
+        }
+
+        Measurement FailCnt;
+        Measurement UsedKB;
+        Measurement LimitKB;
+    };
+
     std::thread mCollectionThread;
     bool mQuit;
     std::condition_variable mCv;
@@ -166,4 +183,6 @@ private:
     ZRAM mZRAM;
     bool mZRAMSupported;
     std::map<std::string, zramMeasurement> mZramMeasurements;
+
+    std::map<std::string, cgroupMeasurement> mCgroupMeasurements;
 };
