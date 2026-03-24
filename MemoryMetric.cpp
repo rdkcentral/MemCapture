@@ -441,7 +441,7 @@ void MemoryMetric::GetCmaMemoryUsage()
     }
 }
 
-void MemoryMetric::GetGpuMemoryUsageAmlogicMediatek()
+void MemoryMetric::GetGpuMemoryUsage()
 {
     if (mGPUMemorySupported) {
         //LOG_INFO("Getting GPU memory usage");
@@ -449,9 +449,8 @@ void MemoryMetric::GetGpuMemoryUsageAmlogicMediatek()
         switch (mPlatform) {
             case (Platform::AMLOGIC): 
             case (Platform::AMLOGIC_950D4):
-            case (Platform::MEDIATEK):
             {
-                GetGpuMemoryUsageAmlogicMediatek();
+                GetGpuMemoryUsageAmlogic();
                 break;
             }
             case (Platform::REALTEK): 
@@ -464,6 +463,12 @@ void MemoryMetric::GetGpuMemoryUsageAmlogicMediatek()
                 GetGpuMemoryUsageBroadcom();
                 break;
             }
+            case (Platform::MEDIATEK):
+            {
+                GetGpuMemoryUsageMediatek();
+                break;
+            }
+
         }
     }
 }
@@ -794,18 +799,8 @@ void MemoryMetric::GetGpuMemoryUsageBroadcom()
     f1c19000      14438        135
     f1bb1000      14292      16359
     f18c0000      10899       4887
-*******************************************************
-Mediatek GPU memory allocation
-cat /sys/kernel/debug/mali0/gpu_memory
-mali0                  39241      63910
-  kctx-0x000000009c7f034f (8338)       1224      11876
-  kctx-0x00000000d12961fe (8313)         42         42
-  kctx-0x00000000ccb28112 (4858)      31980      42542
-  kctx-0x00000000bdeb0aeb (4842)       5268       7064
-  kctx-0x00000000e67451b7 (4412)        109        125
-  kctx-0x0000000045485fee (3817)        618       3425
 */
-void MemoryMetric::GetGpuMemoryUsage()
+void MemoryMetric::GetGpuMemoryUsageAmlogic()
 {
     std::ifstream gpuMem("/sys/kernel/debug/mali0/gpu_memory");
 
@@ -841,6 +836,49 @@ void MemoryMetric::GetGpuMemoryUsage()
     }
 }
 
+/* MediaTek GPU memory allocations
+ *
+ * Values are already in KB (not pages).
+ *
+ * root@xumo-mt120v1:~# cat /sys/kernel/debug/mali0/gpu_memory
+ * mali0                  39241      63910
+ *   kctx-0x000000009c7f034f (8338)       1224      11876
+ *   kctx-0x00000000d12961fe (8313)         42         42
+ *   kctx-0x00000000ccb28112 (4858)      31980      42542
+ *   kctx-0x00000000bdeb0aeb (4842)       5268       7064
+ *   kctx-0x00000000e67451b7 (4412)        109        125
+ *   kctx-0x0000000045485fee (3817)        618       3425
+ */
+void MemoryMetric::GetGpuMemoryUsageMediatek()
+{
+    std::ifstream gpuMem("/sys/kernel/debug/mali0/gpu_memory");
+
+    if (!gpuMem) {
+        LOG_WARN("Could not open gpu_memory file");
+        return;
+    }
+
+    std::string line;
+    while (std::getline(gpuMem, line)) {
+        pid_t pid;
+        long currentKb, peakKb;
+
+        // Format: "  kctx-0x000000009c7f034f (8338)       1224      11876"
+        // %*s skips the hex pointer token; values are already in KB
+        if (sscanf(line.c_str(), "  kctx-%*s (%d) %ld %ld", &pid, &currentKb, &peakKb) == 3) {
+            auto itr = mGpuMeasurements.find(pid);
+            if (itr != mGpuMeasurements.end()) {
+                itr->second.Used.AddDataPoint(currentKb);
+            } else {
+                Process process(pid);
+                Measurement used("Memory_Usage_KB");
+                used.AddDataPoint(currentKb);
+                auto measurement = gpuMeasurement(process, used);
+                mGpuMeasurements.insert(std::make_pair(pid, measurement));
+            }
+        }
+    }
+}
 
 /* Realtek GPU memory allocations
  *
