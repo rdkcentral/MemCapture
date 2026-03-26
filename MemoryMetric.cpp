@@ -146,7 +146,6 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
             // Mediatek reports GPU memory allocations
             mGPUMemorySupported = true;
             break;
-
     }
 
 }
@@ -467,8 +466,7 @@ void MemoryMetric::GetGpuMemoryUsage()
             {
                 GetGpuMemoryUsageMediatek();
                 break;
-            }
-
+            }			
         }
     }
 }

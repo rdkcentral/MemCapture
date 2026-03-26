@@ -66,6 +66,8 @@ private:
     void GetGpuMemoryUsageBroadcom();
 
     void GetGpuMemoryUsageAmlogic();
+    
+    void GetGpuMemoryUsageMediatek();
 
     void GetGpuMemoryUsageMediatek();
 
