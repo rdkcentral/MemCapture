@@ -125,7 +125,7 @@ static void parseArgs(const int argc, char **argv)
                 } else if (platform == "BROADCOM") {
                     gPlatform = Platform::BROADCOM;
                 } else if (platform == "MEDIATEK") {
-                    gPlatform = Platform::MEDIATEK;                    
+                    gPlatform = Platform::MEDIATEK;
                 } else {
                     fprintf(stderr, "Warning: Unsupported platform %s\n", platform.c_str());
                     exit(EXIT_FAILURE);

@@ -98,7 +98,7 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
         mCmaNames = {
                 std::make_pair("cma-cma_23", "cma-cma_23"),
                 std::make_pair("cma-reserved", "cma-reserved")
-        };		
+        };
     }
 
     // Create static measurements for linux memory usage - store in KB
@@ -145,7 +145,7 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
             mMemoryBandwidthSupported = false;
             // Mediatek reports GPU memory allocations
             mGPUMemorySupported = true;
-            break;		
+            break;
     }
 
 }
@@ -621,7 +621,7 @@ void MemoryMetric::CalculateFragmentation()
         } else if (mPlatform == Platform::BROADCOM) {
             columnCount = 15;
         } else if (mPlatform == Platform::MEDIATEK) {
-            columnCount = 15;			
+            columnCount = 15;
         }
 
         if (segments.size() != columnCount) {
