@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <cmath>
 #include <regex>
+#include <climits>
 
 MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerator> reportGenerator)
         : mQuit(false),
@@ -36,7 +37,8 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
           mMemoryBandwidthSupported(false),
           mMemoryFragmentation{},
           mPlatform(platform),
-          mReportGenerator(std::move(reportGenerator))
+          mReportGenerator(std::move(reportGenerator)),
+          mZRAMSupported(false)
 {
 
     // Some metrics are returned as a number of pages instead of bytes, so get page size to be able to calculate
@@ -148,6 +150,7 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
             break;
     }
 
+    mZRAMSupported = mZRAM.hasZRAM();
 }
 
 MemoryMetric::~MemoryMetric()
@@ -197,6 +200,16 @@ void MemoryMetric::CollectData(std::chrono::seconds frequency)
         if (mPlatform == Platform::BROADCOM) {
             GetBroadcomBmemUsage();
         }
+
+        if (mZRAMSupported) {
+            GetZramMetrics();
+        }
+
+        if (mPlatform == Platform::REALTEK) {
+            GetCgroupMetrics("ion");
+        }
+        GetCgroupMetrics("gpu");
+        GetCgroupMetrics("memory");
 
         auto end = std::chrono::high_resolution_clock::now();
         LOG_INFO("MemoryMetric completed in %lld ms",
@@ -333,6 +346,7 @@ void MemoryMetric::SaveResults()
                     measurement.second});
         }
         mReportGenerator->addDataset("BMEM", data);
+        data.clear();
 
         // Add all BMEM memory to accumulated total
         long double bmemSum = 0;
@@ -342,6 +356,27 @@ void MemoryMetric::SaveResults()
         });
         mReportGenerator->addToAccumulatedMemoryUsage(bmemSum);
     }
+
+    if (mZRAMSupported) {
+        for (const auto &result : mZramMeasurements) {
+            data.emplace_back(JsonReportGenerator::dataItems{std::make_pair("Name", result.first), result.second.OrigDataSize, result.second.ComprDataSize,
+                                                             result.second.MemUsedTotal});
+        }
+        mReportGenerator->addDataset("zram", data);
+        data.clear();
+    }
+
+    // *** Cgroup ***
+    for (const auto &result: mCgroupMeasurements) {
+        data.emplace_back(JsonReportGenerator::dataItems{
+                std::make_pair("Heap", result.first),
+                result.second.FailCnt,
+                result.second.LimitKB,
+                result.second.UsedKB
+        });
+    }
+    mReportGenerator->addDataset("Cgroup", data);
+    data.clear();
 }
 
 void MemoryMetric::GetLinuxMemoryUsage()
@@ -955,4 +990,146 @@ pid_t MemoryMetric::tidToParentPid(pid_t tid)
 
     // Failed to find Tgid in file, weird?
     return -1;
+}
+
+void MemoryMetric::GetZramMetrics()
+{
+    if (!mZRAMSupported) {
+        return;
+    }
+
+    std::vector<ZRAMDeviceStats> devStats = mZRAM.GetDeviceStats();
+
+    for (const auto& dev : devStats) {
+        auto itr = mZramMeasurements.find(dev.device_name);
+        if (itr == mZramMeasurements.end()) {
+            Measurement origSize("Data_Used_MB");
+            origSize.AddDataPoint(dev.orig_data_size);
+
+            Measurement compSize("Compressed_Data_MB");
+            compSize.AddDataPoint(dev.compr_data_size);
+
+            Measurement memUsed("Total_Memory_MB");
+            memUsed.AddDataPoint(dev.mem_used_total);
+
+            mZramMeasurements.insert(std::make_pair(dev.device_name, 
+                                    zramMeasurement(origSize, compSize, memUsed)));
+        } else {
+            itr->second.OrigDataSize.AddDataPoint(dev.orig_data_size);
+            itr->second.ComprDataSize.AddDataPoint(dev.compr_data_size);
+            itr->second.MemUsedTotal.AddDataPoint(dev.mem_used_total);
+        }
+    }
+}
+
+void MemoryMetric::GetCgroupMetrics(const std::string &cgroupType)
+{
+    static const std::string CGROUP_BASE = "/sys/fs/cgroup/";
+
+    std::string cgroupKeyStr;
+
+    const std::string cgroupPath = CGROUP_BASE + cgroupType;
+    if (!std::filesystem::exists(cgroupPath)) {
+        return;
+    }
+
+    static std::ifstream fileStream;
+    fileStream.rdbuf()->pubsetbuf(nullptr, 0);
+
+    static const auto readValue = [](std::ifstream &fs, const std::string &path) -> long {
+        fs.clear();
+        fs.open(path);
+        if (!fs) {
+            LOG_WARN("Failed to open file %s", path.c_str());
+            fs.close();
+            return 0;
+        }
+
+        long value = 0;
+        fs >> value;
+        fs.close();
+
+        return (value == LONG_MAX) ? 0 : value;
+    };
+
+    for (const auto &dirEntry : std::filesystem::directory_iterator(cgroupPath)) {
+        if (!dirEntry.is_directory()) {
+            continue;
+        }
+
+        const auto &dirPath = dirEntry.path();
+        const auto &cgroupName = dirPath.filename().string();
+        const auto cgroupKey = cgroupType + ":" + cgroupName;
+
+        const auto basePath = dirPath / cgroupType;
+        try {
+            long usageVal = readValue(fileStream, basePath.string() + ".usage_in_bytes");
+            long limitVal = readValue(fileStream, basePath.string() + ".limit_in_bytes");
+            long failcntVal = readValue(fileStream, basePath.string() + ".failcnt");
+
+            auto itr = mCgroupMeasurements.find(cgroupKey);
+            if (itr != mCgroupMeasurements.end()) {
+                itr->second.UsedKB.AddDataPoint(usageVal / 1024.0);
+                itr->second.LimitKB.AddDataPoint(limitVal / 1024.0);
+                itr->second.FailCnt.AddDataPoint(failcntVal);
+                LOG_DEBUG("%s - Used: %ld, limit: %ld, failcnt: %ld", cgroupKey.c_str(), usageVal, limitVal, failcntVal);
+            } else {
+                Measurement used("Used_KB");
+                used.AddDataPoint(usageVal / 1024.0);
+                Measurement limit("Limit_KB");
+                limit.AddDataPoint(limitVal / 1024.0);
+                Measurement failcnt("Fail_Count");
+                failcnt.AddDataPoint(failcntVal);
+
+                mCgroupMeasurements.insert(std::make_pair(cgroupKey, cgroupMeasurement(failcnt, used, limit)));
+            }
+
+            if (cgroupType == "memory") {
+                long kmemUsage = readValue(fileStream, basePath.string() + ".kmem.usage_in_bytes");
+                long kmemLimit = readValue(fileStream, basePath.string() + ".kmem.limit_in_bytes");
+                long kmemFailcnt = readValue(fileStream, basePath.string() + ".kmem.failcnt");
+
+                long swapUsage = readValue(fileStream, basePath.string() + ".memsw.usage_in_bytes");
+                long swapLimit = readValue(fileStream, basePath.string() + ".memsw.limit_in_bytes");
+                long swapFailcnt = readValue(fileStream, basePath.string() + ".memsw.failcnt");
+
+                cgroupKeyStr = cgroupType + "_KMem:" + cgroupName;
+                auto memItr = mCgroupMeasurements.find(cgroupKeyStr);
+                if (memItr != mCgroupMeasurements.end()) {
+                    memItr->second.UsedKB.AddDataPoint(kmemUsage / 1024.0);
+                    memItr->second.LimitKB.AddDataPoint(kmemLimit / 1024.0);
+                    memItr->second.FailCnt.AddDataPoint(kmemFailcnt);
+                    LOG_DEBUG("%s - used: %ld, limit: %ld, failcnt: %ld", cgroupKeyStr.c_str(), kmemUsage, kmemLimit, kmemFailcnt);
+                } else {
+                    Measurement kmemUsed("Used_KB");
+                    kmemUsed.AddDataPoint(kmemUsage / 1024.0);
+                    Measurement kmemLim("Limit_KB");
+                    kmemLim.AddDataPoint(kmemLimit / 1024.0);
+                    Measurement kmemFail("Fail_Count");
+                    kmemFail.AddDataPoint(kmemFailcnt);
+                    mCgroupMeasurements.insert(std::make_pair(cgroupKeyStr, cgroupMeasurement(kmemFail, kmemUsed, kmemLim)));
+                }
+
+                cgroupKeyStr = cgroupType + "_MemSw:" + cgroupName;
+                memItr = mCgroupMeasurements.find(cgroupKeyStr);
+                if (memItr != mCgroupMeasurements.end()) {
+                    memItr->second.UsedKB.AddDataPoint(swapUsage / 1024.0);
+                    memItr->second.LimitKB.AddDataPoint(swapLimit / 1024.0);
+                    memItr->second.FailCnt.AddDataPoint(swapFailcnt);
+                    LOG_DEBUG("%s - used: %ld, limit: %ld, failcnt: %ld", cgroupKeyStr.c_str(), swapUsage, swapLimit, swapFailcnt);
+                } else {
+                    Measurement swapUsed("Used_KB");
+                    swapUsed.AddDataPoint(swapUsage / 1024.0);
+                    Measurement swapLim("Limit_KB");
+                    swapLim.AddDataPoint(swapLimit / 1024.0);
+                    Measurement swapFail("Fail_Count");
+                    swapFail.AddDataPoint(swapFailcnt);
+                    mCgroupMeasurements.insert(std::make_pair(cgroupKeyStr, cgroupMeasurement(swapFail, swapUsed, swapLim)));
+                }
+            }
+        } catch (const std::exception &) {
+            LOG_WARN("Failed to read cgroup metrics for %s", cgroupKey.c_str());
+            continue;
+        }
+    }
 }
