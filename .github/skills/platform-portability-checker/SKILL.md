@@ -15,7 +15,7 @@ hardcoded paths, or silent fallbacks that hide missing metrics.
 - Adding a new platform to the `Platform` enum
 - Adding a new GPU or bandwidth metric with platform-specific paths
 - Reviewing a PR that changes switch statements in `MemoryMetric.cpp`
-- Investigating missing metrics in `results.json` for a specific device
+- Investigating missing metrics in `report.json` for a specific device
 - Auditing all sysfs/proc file access for correctness
 
 ## Supported Platforms
