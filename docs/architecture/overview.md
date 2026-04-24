@@ -3,9 +3,13 @@
 ## Overview
 
 MemCapture is a single-binary C++17 utility that captures memory and CPU statistics on RDK set-top
-devices over a configurable duration and emits an HTML report (and optionally a JSON file) containing
+devices across both RDK-E and RDK-V deployments over a configurable duration and emits an HTML report (and optionally a JSON file) containing
 min/max/mean statistics for every metric collected. It is designed to run at lowered process priority
 so it does not affect the device workload being measured.
+
+The codebase is primarily used on Linux-based RDK device targets and the reporting / collection flow is
+applicable to both RDK-E and RDK-V environments. Some metadata fields remain platform-dependent and may
+return `"unknown"` on non-device or partially provisioned hosts.
 
 ---
 
@@ -214,6 +218,127 @@ Supported platform strings (passed via `--platform`):
 | `Platform::REALTEK64` | `REALTEK64` | 64-bit Realtek |
 | `Platform::BROADCOM` | `BROADCOM` | BCM / Nexus |
 | `Platform::MEDIATEK` | `MEDIATEK` | MediaTek |
+
+---
+
+## Runtime Behavior on RDK-E and RDK-V
+
+MemCapture does not contain a separate `RDK-E` versus `RDK-V` execution path in code. Runtime
+behaviour is determined by three things:
+
+1. CLI options passed at startup
+2. the selected `Platform` enum (`--platform`)
+3. which Linux files and kernel features actually exist on the target device
+
+That means the binary follows the same orchestration model on both stacks, while the set of
+successful metrics depends on what the target exposes.
+
+### Common runtime flow
+
+```mermaid
+flowchart TD
+        A["MemCapture starts"] --> B["Parse CLI\n--duration --platform --output-dir\n--json --groups --cpuidle"]
+        B --> C["Register SIGINT / SIGTERM\nset nice(10)"]
+        C --> D["Create output directory"]
+        D --> E{"--groups supplied?"}
+        E -->|yes| F["Parse groups JSON\nconstruct GroupManager"]
+        E -->|no| G["No grouping"]
+        F --> H["Construct Metadata\nand JsonReportGenerator"]
+        G --> H
+        H --> I["Construct ProcessMetric\nand MemoryMetric"]
+        I --> J["Start 3-second sampling threads"]
+        J --> K{"--cpuidle and build flag enabled?"}
+        K -->|yes| L["Start CpuIdleMetric interval capture"]
+        K -->|no| M["Skip CPU idle metric"]
+        L --> N["Wait for duration\nor signal"]
+        M --> N
+        N --> O["Stop metrics\nand join threads"]
+        O --> P["SaveResults() from main thread"]
+        P --> Q["Render report.html"]
+        Q --> R{"--json supplied?"}
+        R -->|yes| S["Write results.json"]
+        R -->|no| T["HTML only"]
+```
+
+### Runtime behaviour by stack
+
+| Runtime aspect | RDK-E stack | RDK-V stack |
+|----------------|-------------|-------------|
+| Startup sequence | Same as RDK-V: parse CLI, create output dir, build metrics, start threads | Same as RDK-E |
+| Sampling cadence | Same defaults: `ProcessMetric` and `MemoryMetric` every 3 seconds | Same defaults: `ProcessMetric` and `MemoryMetric` every 3 seconds |
+| Signal handling | `SIGINT` / `SIGTERM` causes graceful stop and report save | `SIGINT` / `SIGTERM` causes graceful stop and report save |
+| Metadata | Uses `/etc/device.properties`, `/version.txt`, `/sys/class/net/eth0/address` when present; may be `Unknown` on generic or partially provisioned hosts | Same file probes; more likely to be populated on full device images |
+| Linux / process metrics | Generally available if `/proc/meminfo`, `/proc/<pid>/smaps(_rollup)` exist | Generally available if `/proc/meminfo`, `/proc/<pid>/smaps(_rollup)` exist |
+| Container metrics | Available only when `/sys/fs/cgroup/memory` exists and contains useful cgroups | Available only when `/sys/fs/cgroup/memory` exists and contains useful cgroups |
+| GPU / multimedia metrics | Only available if platform-specific debug nodes are present on that device | Commonly relevant on multimedia STB SoCs; still gated by file presence |
+| CPU idle metrics | Requires `ENABLE_CPU_IDLE_METRICS` build flag and kernel `prctl` idle metrics support | Requires `ENABLE_CPU_IDLE_METRICS` build flag and kernel `prctl` idle metrics support |
+| Output files | `report.html` always; `results.json` only with `-j` | `report.html` always; `results.json` only with `-j` |
+
+### What changes in practice between RDK-E and RDK-V
+
+The main behavioral difference is **metric coverage**, not control flow.
+
+| Category | Practical outcome on RDK-E | Practical outcome on RDK-V |
+|----------|----------------------------|----------------------------|
+| Core Linux memory | Usually available | Usually available |
+| Per-process memory | Usually available | Usually available |
+| Grouped process reporting | Available when `-g <groups.json>` is supplied | Available when `-g <groups.json>` is supplied |
+| Container cgroup accounting | Depends on cgroup layout of the broadband / gateway image | Depends on cgroup layout of the video / device image |
+| GPU memory | Often absent on non-multimedia targets or unsupported platforms | Often meaningful on Amlogic / Broadcom / MediaTek / Realtek video devices |
+| DDR bandwidth | Only on supported Amlogic-based targets | Only on supported Amlogic-based targets |
+| Broadcom BMEM | Only on Broadcom targets | Only on Broadcom targets |
+| Fragmentation / buddyinfo | Available only if `/proc/buddyinfo` exists and matches expected column layout | Available only if `/proc/buddyinfo` exists and matches expected column layout |
+
+### Developer interpretation
+
+- Treat MemCapture as a **capability-driven collector** on both stacks.
+- If a device lacks the required sysfs or procfs node, the corresponding dataset is skipped or left empty.
+- Empty optional datasets are not necessarily failures; they usually mean the platform or image does not expose
+    that metric.
+- The most portable datasets across RDK-E and RDK-V are `Linux Memory`, `processes`, `metadata`, and optional
+    `pssByGroup` when grouping is enabled.
+- The least portable datasets are `GPU Memory`, `Memory Bandwidth`, `BMEM`, and some CPU idle features because
+    they depend on vendor-specific kernel interfaces.
+
+### Typical runtime examples
+
+**RDK-E-oriented run**
+
+```bash
+./MemCapture --platform BROADCOM --duration 30 --json --output-dir /tmp/memcapture_rdke/
+```
+
+Expected behaviour:
+- starts the same collection threads as any other target
+- always attempts Linux memory and process collection
+- may populate `BMEM` on Broadcom devices
+- may leave GPU or CPU idle datasets empty if the required nodes are absent or disabled
+
+**RDK-V-oriented run**
+
+```bash
+./MemCapture --platform AMLOGIC --duration 30 --groups ./groups.example.json --json --cpuidle --output-dir /tmp/memcapture_rdkv/
+```
+
+Expected behaviour:
+- starts process and memory sampling every 3 seconds
+- enables CPU idle interval capture when built with `ENABLE_CPU_IDLE_METRICS`
+- can populate Linux memory, CMA, GPU memory, container metrics, fragmentation, and DDR bandwidth on supported images
+- writes both `report.html` and `results.json`
+
+### Failure and degradation model
+
+| Condition | Runtime result |
+|-----------|----------------|
+| Invalid `--platform` | Process exits with failure during argument parsing |
+| Invalid `--groups` JSON | Process exits with failure before starting capture |
+| Missing output directory permissions | Process exits with failure before capture starts |
+| Missing optional metric files | Warning logged; capture continues without that dataset |
+| `SIGTERM` / `SIGINT` during capture | Early termination flag set; in-flight collection completes; report still saved |
+| CPU idle requested without build support | Error logged; other metrics continue |
+
+This degradation behaviour is the same on both RDK-E and RDK-V stacks and is one of the main reasons
+the tool is practical across heterogeneous device families.
 
 ---
 

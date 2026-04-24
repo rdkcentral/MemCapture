@@ -194,7 +194,7 @@ After each run, audit which metrics were collected vs. which are unavailable on 
 | Memory fragmentation (buddyinfo) | `MemoryMetric.cpp` | check |
 | CPU idle metrics | `CpuIdleMetric.cpp` | check (-c flag) |
 | Process grouping | `GroupManager.cpp` | check (-g flag) |
-| Device metadata (image, MAC) | `Metadata.cpp` | check (RDK-V only) |
+| Device metadata (image, MAC) | `Metadata.cpp` | check (RDK-E / RDK-V device metadata) |
 
 Update this table with actual results (`✅` / `❌` / `N/A`).
 
@@ -204,7 +204,7 @@ Update this table with actual results (`✅` / `❌` / `N/A`).
 
 - **Never** modify source files as part of a build/test run — only suggest edits.
 - **Never** retry a failed build step automatically — show the failure summary and stop.
-- If the platform running the test is not an RDK-V device, `Metadata` fields for image version
+- If the platform running the test is not an RDK-E or RDK-V device, `Metadata` fields for image version
   and MAC address will return `"unknown"` — this is expected behaviour, not a failure.
 - If `/proc/buddyinfo` or GPU sysfs nodes are absent on the test host, the corresponding metrics
   will be empty — document this in the coverage audit, not as a failure.

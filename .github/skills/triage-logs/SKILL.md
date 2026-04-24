@@ -77,7 +77,7 @@ grep -i "error\|warn\|fail\|not found\|unable" stderr.log
 | CPU idle table missing | `CpuIdleMetric.cpp` (requires `-c` flag and kernel support) |
 | HTML report not generated | `JsonReportGenerator.cpp`, `templates/template.html` (incbin) |
 | results.json not generated | `JsonReportGenerator.cpp` (requires `-j` flag) |
-| Metadata shows "unknown" | `Metadata.cpp` (RDK-V only; expected on non-RDK hosts) |
+| Metadata shows "unknown" | `Metadata.cpp` (RDK-E / RDK-V device metadata when available; expected on non-RDK hosts) |
 
 ---
 

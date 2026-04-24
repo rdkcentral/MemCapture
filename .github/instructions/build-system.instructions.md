@@ -155,8 +155,8 @@ find_package_handle_standard_args(Breakpad DEFAULT_MSG
 | Platform | Build method | Notes |
 |----------|-------------|-------|
 | Linux desktop | CMake + vcpkg | Full feature set |
-| RDK-V (Amlogic, Realtek, etc.) | Yocto recipe | No vcpkg; nlohmann_json + inja from sysroot |
-| RDK-V with Breakpad | Yocto recipe + Breakpad lib | Set `USE_BREAKPAD` define |
+| RDK-E / RDK-V devices (Amlogic, Realtek, Broadcom, Mediatek, etc.) | Yocto recipe | No vcpkg; `nlohmann_json` + `inja` from sysroot |
+| RDK-E / RDK-V with Breakpad | Yocto recipe + Breakpad lib | Set `USE_BREAKPAD` define |
 
 ```makefile
 # Test targets
