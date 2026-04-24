@@ -61,8 +61,9 @@ You'll receive:
 
 ## Prerequisites
 
-- Docker installed and running
-- Access to GitHub Container Registry if the image is not already cached locally
+- CMake 3.10+, a C++17 compiler, and vcpkg installed
+- cppcheck, valgrind, and helgrind available on the host
+- Consistent with local developer workflow (no Docker required)
 
 ## Tips
 

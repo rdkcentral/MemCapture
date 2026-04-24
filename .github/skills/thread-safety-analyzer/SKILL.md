@@ -234,16 +234,18 @@ std::atomic<bool> mQuit{false};  // Atomic — guaranteed visibility
 ### Issue: Map reference held across collection cycle
 
 ```cpp
-// PROBLEM
+// PROBLEM: Using std::unordered_map — insertions may rehash and invalidate references
 auto& ref = mLinuxMemoryMeasurements["MemTotal"];
-mLinuxMemoryMeasurements.emplace("MemFree", Measurement("MemFree"));  // may rehash
+mLinuxMemoryMeasurements.emplace("MemFree", Measurement("MemFree"));  // may rehash (unordered_map)
 ref.AddSample(value);  // DANGLING — ref invalidated by rehash
 
-// FIX: Insert all keys at startup (constructor), then only AddSample
+// NOTE: std::map is tree-based and does NOT rehash; references to existing elements
+// remain valid across insertions. However, the safer pattern for both map types is:
+// Insert all keys at startup (constructor), then only AddSample in the collection loop.
 mLinuxMemoryMeasurements.emplace("MemTotal", Measurement("MemTotal"));
 mLinuxMemoryMeasurements.emplace("MemFree", Measurement("MemFree"));
 // In collection loop:
-mLinuxMemoryMeasurements.at("MemTotal").AddSample(value);  // safe — no rehash
+mLinuxMemoryMeasurements.at("MemTotal").AddSample(value);  // safe — no structural changes
 ```
 
 ## Output Format

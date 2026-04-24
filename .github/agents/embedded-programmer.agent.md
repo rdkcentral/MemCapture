@@ -46,7 +46,7 @@ You are an expert embedded systems C++17 developer specializing in the MemCaptur
 - Memory bandwidth from platform-specific nodes
 
 ### Report Generation
-- `JsonReportGenerator` accumulates all metric samples; serialized to `results.json` via nlohmann_json
+- `JsonReportGenerator` accumulates all metric samples; serialized to `report.json` via nlohmann_json, with datasets organized under the top-level `data` array
 - HTML report uses Inja template engine with `templates/template.html` embedded via `incbin`
 - `Metadata` class captures platform, image version, MAC, timestamp for report headers
 - `Measurement` tracks min/max/mean across the capture duration

@@ -110,15 +110,16 @@ Also check:
 Measurement m("MemTotal");
 m.AddSample(value);  // safe for first sample
 
-// BAD: Iterator invalidation
+// BAD: Iterator invalidation with std::unordered_map — insertions may rehash
 auto& ref = mLinuxMemoryMeasurements["MemTotal"];
-mLinuxMemoryMeasurements["MemFree"] = Measurement("MemFree");  // may rehash map!
-ref.AddSample(100);  // ref is now dangling
+mLinuxMemoryMeasurements["MemFree"] = Measurement("MemFree");  // may rehash (unordered_map)!
+ref.AddSample(100);  // ref may be dangling if map was rehashed
 ```
 
 For `std::map<std::string, Measurement>`:
-- Do not hold references or iterators across insertions
-- Use `emplace` with a moved value to avoid unnecessary copies
+- `std::map` is tree-based and does **not** rehash; references and iterators to existing elements remain valid across insertions
+- For `std::unordered_map`, do not hold references across insertions as they may trigger a rehash
+- The safest pattern for both: insert all keys at construction, then use only `at()` or `AddSample` in the collection loop
 
 ### Step 6: Static Analysis
 

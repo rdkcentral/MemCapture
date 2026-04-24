@@ -16,7 +16,7 @@ Improve code quality, reduce technical debt, and enhance maintainability of MemC
 - **Zero regressions**: HTML and JSON report output must be bit-identical for the same inputs
 - **Platform coverage**: All supported platforms (Amlogic, Realtek, Broadcom, Mediatek) must continue to work
 - **API stability**: `IMetric` interface contract must not change without updating all implementations
-- **Output schema stability**: JSON key names in `results.json` must not change (downstream consumers depend on them)
+- **Output schema stability**: JSON key names in `report.json` must not change (downstream consumers depend on them)
 
 ## Your Process
 
@@ -29,7 +29,7 @@ Improve code quality, reduce technical debt, and enhance maintainability of MemC
 
 ### 2. Establish Safety Net
 - Build MemCapture and run a 10-second test capture before any changes
-- Save the `results.json` and `report.html` as baseline
+- Save the `report.json` and `report.html` as baseline
 - Use `diff` to compare outputs before and after refactoring
 - Run with AddressSanitizer (`-fsanitize=address`) to catch memory issues
 
@@ -116,14 +116,14 @@ mLinuxMemoryMeasurements["MemTotal"].AddSample(value);
 
 ### Before Any Refactoring
 1. Build MemCapture cleanly (`cmake --build .` with no warnings)
-2. Run a 10-second test capture and save baseline `results.json` and `report.html`
+2. Run a 10-second test capture and save baseline `report.json` and `report.html`
 3. Run with AddressSanitizer to confirm no existing memory issues
 4. Document the current JSON schema structure from `JsonReportGenerator`
 
 ### During Refactoring
 1. Make one logical change at a time
 2. Rebuild and re-run test capture after EVERY change
-3. `diff` the new `results.json` against the baseline — no unexpected changes allowed
+3. `diff` the new `report.json` against the baseline — no unexpected changes allowed
 4. Use git to create checkpoint commits after each verified step
 
 ### After Refactoring
@@ -179,7 +179,7 @@ If a new platform fails to build:
 
 You've succeeded when:
 - All platforms build cleanly with no warnings
-- `results.json` output is identical to the baseline for the same test capture
+- `report.json` output is identical to the baseline for the same test capture
 - AddressSanitizer is clean
 - Code is more maintainable, readable, or testable than before
 - Peer review is complete

@@ -138,14 +138,14 @@ valgrind --leak-check=full \
              --output-dir /tmp/integration_test/
 
 # Verify outputs exist
-ls -la /tmp/integration_test/report.html /tmp/integration_test/results.json
+ls -la /tmp/integration_test/report.html /tmp/integration_test/report.json
 
 # Verify JSON schema
 python3 -c "
 import json, sys
-with open('/tmp/integration_test/results.json') as f:
+with open('/tmp/integration_test/report.json') as f:
     d = json.load(f)
-expected = ['metadata', 'memory', 'processes']
+expected = ['metadata', 'data', 'processes']
 missing = [k for k in expected if k not in d]
 print('MISSING keys:', missing) if missing else print('JSON schema OK')
 "

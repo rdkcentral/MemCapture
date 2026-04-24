@@ -224,4 +224,4 @@ After fixes:
 1. `grep -c "case Platform::" MemoryMetric.cpp` — count matches 6 × number of switches
 2. All `ifstream` openings have `is_open()` checks or `exists()` guards
 3. No `uint32_t` or `int` used for memory quantities parsed from `/proc`
-4. All 6 platforms produce valid (possibly empty) `results.json` without crashing
+4. All 6 platforms produce valid (possibly empty) `report.json` without crashing

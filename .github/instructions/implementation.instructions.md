@@ -38,5 +38,5 @@
 
 6. **Testing**
     - Write unit tests for parser classes (`MemInfo`, `Smaps`) using mock `/proc` files.
-    - Run a 30-second test capture on a real or simulated device and diff `results.json` against a baseline.
+    - Run a 30-second test capture on a real or simulated device and diff `report.json` against a baseline.
     - Build with `-fsanitize=address` and verify no AddressSanitizer errors.

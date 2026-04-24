@@ -11,7 +11,7 @@
         - What data is collected and from which `/proc` or sysfs source
         - Which platforms support this metric (and which do not)
         - Inputs to the metric (frequency, platform, optional flags)
-        - Output: which JSON keys are added to `results.json`
+        - Output: which JSON keys are added to `report.json`
         - Constraints: file access latency, device memory budget
         - Edge cases: file absent, permission denied, unexpected format
 
@@ -19,7 +19,7 @@
     - For each new component, create a separate HLD `.md` file including:
         - Where it fits in the `IMetric` architecture
         - Platform dispatch strategy (new switch case vs. separate subclass)
-        - Data flow: `/proc` or sysfs → `Measurement` → `JsonReportGenerator` → `results.json`
+        - Data flow: `/proc` or sysfs → `Measurement` → `JsonReportGenerator` → `report.json`
         - Threading: does collection run in the metric's own thread?
         - Memory: which `Measurement` objects or `std::map` entries are needed
 

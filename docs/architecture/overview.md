@@ -9,7 +9,7 @@ so it does not affect the device workload being measured.
 
 The codebase is primarily used on Linux-based RDK device targets and the reporting / collection flow is
 applicable to both RDK-E and RDK-V environments. Some metadata fields remain platform-dependent and may
-return `"unknown"` on non-device or partially provisioned hosts.
+return `"Unknown"` on non-device or partially provisioned hosts.
 
 ---
 
@@ -21,8 +21,8 @@ graph TB
     MC["MemCapture binary"]
     proc["/proc filesystem"]
     sysfs["/sys filesystem"]
-    HTML["HTML Report\n(results.html)"]
-    JSON["JSON Data\n(results.json)"]
+    HTML["HTML Report\n(report.html)"]
+    JSON["JSON Data\n(report.json)"]
 
     User -->|"MemCapture --platform AMLOGIC\n--duration 30 --output-dir /tmp/out"| MC
     MC -->|"reads /proc/meminfo\n/proc/&lt;pid&gt;/smaps_rollup"| proc
@@ -59,7 +59,7 @@ graph TB
     end
 
     subgraph output["Report Layer"]
-        JRG["JsonReportGenerator\n(accumulates all samples)"]
+        JRG["JsonReportGenerator\n(serializes aggregated measurements)"]
         INJA["Inja template engine\n(renders template.html)"]
         TMPL["template.html\n(embedded via incbin)"]
     end
@@ -84,8 +84,8 @@ graph TB
 
     JRG --> INJA
     TMPL --> INJA
-    INJA --> HTML_OUT["results.html"]
-    JRG --> JSON_OUT["results.json"]
+    INJA --> HTML_OUT["report.html"]
+    JRG --> JSON_OUT["report.json"]
 ```
 
 ---
@@ -183,8 +183,8 @@ flowchart LR
     subgraph Reporting["Report Generation (main thread, post-stop)"]
         H --> I["JsonReportGenerator::addDataset()"]
         I --> J["nlohmann::json object"]
-        J -->|Inja template render| K["results.html"]
-        J -->|--json flag| L["results.json"]
+        J -->|Inja template render| K["report.html"]
+        J -->|--json flag| L["report.json"]
     end
 ```
 
@@ -256,7 +256,7 @@ flowchart TD
         O --> P["SaveResults() from main thread"]
         P --> Q["Render report.html"]
         Q --> R{"--json supplied?"}
-        R -->|yes| S["Write results.json"]
+        R -->|yes| S["Write report.json"]
         R -->|no| T["HTML only"]
 ```
 
@@ -272,7 +272,7 @@ flowchart TD
 | Container metrics | Available only when `/sys/fs/cgroup/memory` exists and contains useful cgroups | Available only when `/sys/fs/cgroup/memory` exists and contains useful cgroups |
 | GPU / multimedia metrics | Only available if platform-specific debug nodes are present on that device | Commonly relevant on multimedia STB SoCs; still gated by file presence |
 | CPU idle metrics | Requires `ENABLE_CPU_IDLE_METRICS` build flag and kernel `prctl` idle metrics support | Requires `ENABLE_CPU_IDLE_METRICS` build flag and kernel `prctl` idle metrics support |
-| Output files | `report.html` always; `results.json` only with `-j` | `report.html` always; `results.json` only with `-j` |
+| Output files | `report.html` always; `report.json` only with `-j` | `report.html` always; `report.json` only with `-j` |
 
 ### What changes in practice between RDK-E and RDK-V
 
@@ -324,7 +324,7 @@ Expected behaviour:
 - starts process and memory sampling every 3 seconds
 - enables CPU idle interval capture when built with `ENABLE_CPU_IDLE_METRICS`
 - can populate Linux memory, CMA, GPU memory, container metrics, fragmentation, and DDR bandwidth on supported images
-- writes both `report.html` and `results.json`
+- writes both `report.html` and `report.json`
 
 ### Failure and degradation model
 
@@ -582,8 +582,8 @@ flowchart TD
     A["SaveResults() calls\n(main thread, sequential)"] --> B["JsonReportGenerator\naccumulates nlohmann::json"]
     B --> C{"Output mode"}
     C -->|always| D["Inja::render(template.html, json_data)"]
-    C -->|--json flag| E["json.dump() → results.json"]
-    D --> F["results.html"]
+    C -->|--json flag| E["json.dump() → report.json"]
+    D --> F["report.html"]
 
     subgraph embed["Compile-time embedding"]
         G["templates/template.html"] -->|"incbin macro\n(INCBIN)"| H["g_templateHtml_data\n(binary blob in executable)"]

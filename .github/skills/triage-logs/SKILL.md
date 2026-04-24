@@ -11,7 +11,7 @@ description: >
 
 ## Purpose
 
-Systematically correlate MemCapture output (HTML report, `results.json`, stderr) with the
+Systematically correlate MemCapture output (HTML report, `report.json`, stderr) with the
 source code to identify likely root causes and propose fixes for any behavioural anomaly.
 
 ---
@@ -21,7 +21,7 @@ source code to identify likely root causes and propose fixes for any behavioural
 Invoke this skill when:
 - MemCapture exits with a non-zero code or crashes
 - The HTML report is missing expected sections (memory table, process table, CPU idle)
-- `results.json` is missing expected keys or contains zero/unexpected values
+- `report.json` is missing expected keys or contains zero/unexpected values
 - A metric shows 0 or `null` for all samples on a specific platform
 - Process grouping is not working as expected
 - MemCapture is consuming excessive CPU or memory on the target device
@@ -37,22 +37,23 @@ Typical files to inspect first:
 ```text
 <output-dir>/
     report.html          <- HTML report (open in browser)
-    results.json         <- Raw data (use jq or python to inspect)
+    report.json          <- Raw data (use jq or python to inspect)
 stderr from launch       <- Capture with: ./MemCapture ... 2>stderr.log
 ```
 
 Collect relevant context:
 ```bash
 # Inspect JSON top-level keys
-python3 -c "import json; d=json.load(open('results.json')); print(list(d.keys()))"
+python3 -c "import json; d=json.load(open('report.json')); print(list(d.keys()))"
 
 # Check for zero-value metrics
 python3 -c "
 import json
-d = json.load(open('results.json'))
-for k, v in d.get('memory', {}).items():
-    if isinstance(v, dict) and v.get('mean', -1) == 0:
-        print(f'ZERO: {k}')
+d = json.load(open('report.json'))
+for entry in d.get('data', []):
+    if isinstance(entry, dict) and entry.get('Average', -1) == 0:
+        name = entry.get('Name', '<unnamed>')
+        print(f'ZERO: {name}')
 "
 
 # Check stderr for /proc or sysfs errors
@@ -76,8 +77,8 @@ grep -i "error\|warn\|fail\|not found\|unable" stderr.log
 | Process grouping wrong | `GroupManager.cpp`, groups JSON file |
 | CPU idle table missing | `CpuIdleMetric.cpp` (requires `-c` flag and kernel support) |
 | HTML report not generated | `JsonReportGenerator.cpp`, `templates/template.html` (incbin) |
-| results.json not generated | `JsonReportGenerator.cpp` (requires `-j` flag) |
-| Metadata shows "unknown" | `Metadata.cpp` (RDK-E / RDK-V device metadata when available; expected on non-RDK hosts) |
+| report.json not generated | `JsonReportGenerator.cpp` (requires `-j` flag) |
+| Metadata shows "Unknown" | `Metadata.cpp` (RDK-E / RDK-V device metadata when available; expected on non-RDK hosts) |
 
 ---
 
@@ -195,7 +196,7 @@ strace -p <pid> -e trace=read,write,futex 2>&1 | head -50
 
 ### JSON Report Schema Issues
 
-If `results.json` is missing keys:
+If `report.json` is missing keys:
 - Check `JsonReportGenerator::SaveResults()` for the expected key names
 - Verify `StopCollection()` and `SaveResults()` were called for every metric
 
@@ -220,7 +221,7 @@ cmake --build . --parallel $(nproc)
              --output-dir /tmp/triage_test/ 2>stderr.log
 
 # Inspect output
-python3 -c "import json; d=json.load(open('/tmp/triage_test/results.json')); print(list(d.keys()))"
+python3 -c "import json; d=json.load(open('/tmp/triage_test/report.json')); print(list(d.keys()))"
 cat stderr.log
 ```
 
@@ -307,7 +308,7 @@ Present findings in this structure:
 
 ## Test / Validation
 
-[how to verify the fix — diff results.json, re-run MemCapture]
+[how to verify the fix — diff report.json, re-run MemCapture]
 ```
 
 

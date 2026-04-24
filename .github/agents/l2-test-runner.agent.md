@@ -111,7 +111,7 @@ Run a short capture (10 seconds) to verify metric collection:
 ```
 
 Expected: exit code 0 and the directory `/tmp/memcapture_test_output/` contains `report.html`
-and `results.json`.
+and `report.json`.
 
 If MemCapture exits non-zero:
 1. Capture stderr output.
