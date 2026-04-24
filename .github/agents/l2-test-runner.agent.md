@@ -130,17 +130,17 @@ grep -c "Process Memory" /tmp/memcapture_test_output/report.html
 
 ### Step 6 — Validate JSON schema
 
-When `-j` flag is used, verify `results.json` contains expected top-level keys:
+When `-j` flag is used, verify `report.json` exists and contains the expected top-level `data` array:
 
 ```bash
 python3 -c "
 import json, sys
-with open('/tmp/memcapture_test_output/results.json') as f:
+with open('/tmp/memcapture_test_output/report.json') as f:
     d = json.load(f)
-expected = ['metadata', 'memory', 'processes']
-missing = [k for k in expected if k not in d]
-if missing:
-    print('MISSING keys:', missing); sys.exit(1)
+if 'data' not in d:
+    print('MISSING key: data'); sys.exit(1)
+if not isinstance(d['data'], list):
+    print('INVALID schema: data is not a list'); sys.exit(1)
 print('JSON schema OK')
 "
 ```
