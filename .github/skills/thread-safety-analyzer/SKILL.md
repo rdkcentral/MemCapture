@@ -15,7 +15,7 @@ issues that can cause race conditions, deadlocks, or data corruption during capt
 Invoke this skill when:
 - Reviewing new `IMetric` subclass implementations
 - Debugging a hang at end of capture (stuck `StopCollection()`)
-- Investigating data corruption in `results.json` (garbled values)
+- Investigating data corruption in `report.json` (garbled values)
 - Adding a new field to `mLinuxMemoryMeasurements` map
 - Changing the `ConditionVariable` or `mQuit` flag logic
 - Reviewing `JsonReportGenerator` access patterns
