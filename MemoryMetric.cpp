@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <cmath>
 #include <regex>
+#include <array>
 
 MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerator> reportGenerator)
         : mQuit(false),
@@ -32,8 +33,12 @@ MemoryMetric::MemoryMetric(Platform platform, std::shared_ptr<JsonReportGenerato
           mLinuxMemoryMeasurements{},
           mCmaFree("Value_KB"),
           mCmaBorrowed("Value_KB"),
+          mSwapTotalKb(0),
+          mSwapUsedKb(0),
+          mSwapFreeKb(0),
           mMemoryBandwidth("Memory_Bandwidth_kbps"),
           mMemoryBandwidthSupported(false),
+          mSwapDetailsSupported(false),
           mMemoryFragmentation{},
           mPlatform(platform),
           mReportGenerator(std::move(reportGenerator))
@@ -188,6 +193,7 @@ void MemoryMetric::CollectData(std::chrono::seconds frequency)
         auto start = std::chrono::high_resolution_clock::now();
 
         GetLinuxMemoryUsage();
+        GetSwapMemoryDetails();
         GetCmaMemoryUsage();
         GetGpuMemoryUsage();
         GetContainerMemoryUsage();
@@ -227,6 +233,20 @@ void MemoryMetric::SaveResults()
         mReportGenerator->setAverageLinuxMemoryUsage(it->second.GetAverageRounded());
     }
     data.clear();
+
+    // *** Swap Memory Details (/usr/bin/free) ***
+    if (mSwapDetailsSupported) {
+        data.emplace_back(JsonReportGenerator::dataItems{
+            std::make_pair("total", std::to_string(mSwapTotalKb)),
+            std::make_pair("used", std::to_string(mSwapUsedKb)),
+            std::make_pair("free", std::to_string(mSwapFreeKb)),
+            std::make_pair("shared", "-"),
+            std::make_pair("buff/cache", "-"),
+            std::make_pair("available", "-")
+        });
+        mReportGenerator->addDataset("Swap Memory", data);
+        data.clear();
+    }
 
     // *** GPU Memory Usage ***
     if (mGPUMemorySupported) {
@@ -288,11 +308,16 @@ void MemoryMetric::SaveResults()
     mReportGenerator->addDataset("CMA Summary", data);
     data.clear();
 
-    // *** Per-container memory usage ***
+    // *** Per-container resource usage ***
     for (const auto &result: mContainerMeasurements) {
         data.emplace_back(JsonReportGenerator::dataItems{
-                std::make_pair("Container", result.first),
-                result.second
+                std::make_pair("Container",          result.first),
+                result.second.MemoryUsed,
+                std::make_pair("CPU_Usage_ns",       std::to_string(result.second.CpuUsage)),
+                std::make_pair("CPU_Usage_User_ns",  std::to_string(result.second.CpuUsageUser)),
+                std::make_pair("CPU_Usage_Sys_ns",   std::to_string(result.second.CpuUsageSys)),
+                std::make_pair("Swap_Used_KB",       std::to_string(result.second.SwapUsed)),
+                std::make_pair("GPU_Memory_Used_KB", std::to_string(result.second.GpuMemoryUsed))
         });
     }
     mReportGenerator->addDataset("Containers", data);
@@ -475,12 +500,12 @@ void MemoryMetric::GetContainerMemoryUsage()
 {
     //LOG_INFO("Getting Container memory usage");
 
-    long double memoryUsageKb = 0;
-
     // List of systemd-created cgroups which we are not interested in.
     static const std::regex ignoreRegex = std::regex("(init.scope)|(.*.slice)|(.*.mount)|(.*.scope)");
 
     std::string memoryCgroupDir = "/sys/fs/cgroup/memory";
+    std::string cpuacctCgroupDir = "/sys/fs/cgroup/cpuacct";
+    std::string gpuCgroupDir = "/sys/fs/cgroup/gpu";
 
     if (!std::filesystem::exists(memoryCgroupDir)) {
         return;
@@ -495,22 +520,105 @@ void MemoryMetric::GetContainerMemoryUsage()
         }
 
         auto containerName = dirEntry.path().filename().string();
-        if (!std::regex_match(containerName, ignoreRegex)) {
-            auto memoryUsageFile = std::ifstream(dirEntry.path() / "memory.usage_in_bytes");
+        if (std::regex_match(containerName, ignoreRegex)) {
+            continue;
+        }
+
+        long double memoryUsageKb = 0;
+        auto memoryUsageFile = std::ifstream(dirEntry.path() / "memory.usage_in_bytes");
+        if (memoryUsageFile) {
             memoryUsageFile >> memoryUsageKb;
             memoryUsageKb /= (long double) 1024.0;
-
-            auto itr = mContainerMeasurements.find(containerName);
-
-            if (itr != mContainerMeasurements.end()) {
-                auto &measurement = itr->second;
-                measurement.AddDataPoint(memoryUsageKb);
-            } else {
-                Measurement measurement("Memory_Used_KB");
-                measurement.AddDataPoint(memoryUsageKb);
-                mContainerMeasurements.insert(std::make_pair(containerName, measurement));
-            }
         }
+
+        long double cpuUsageNs = 0;
+        std::ifstream cpuUsageFile(std::filesystem::path(cpuacctCgroupDir) / containerName / "cpuacct.usage");
+        if (cpuUsageFile) {
+            cpuUsageFile >> cpuUsageNs;
+        }
+
+        long double cpuUsageUserNs = 0;
+        std::ifstream cpuUsageUserFile(std::filesystem::path(cpuacctCgroupDir) / containerName / "cpuacct.usage_user");
+        if (cpuUsageUserFile) {
+            cpuUsageUserFile >> cpuUsageUserNs;
+        }
+
+        long double cpuUsageSysNs = 0;
+        std::ifstream cpuUsageSysFile(std::filesystem::path(cpuacctCgroupDir) / containerName / "cpuacct.usage_sys");
+        if (cpuUsageSysFile) {
+            cpuUsageSysFile >> cpuUsageSysNs;
+        }
+
+        long double memswUsageKb = 0;
+        std::ifstream memswUsageFile(dirEntry.path() / "memory.memsw.usage_in_bytes");
+        if (memswUsageFile) {
+            memswUsageFile >> memswUsageKb;
+            memswUsageKb /= (long double) 1024.0;
+        }
+        long double swapUsageKb = std::max((long double) 0, memswUsageKb - memoryUsageKb);
+
+        long double gpuMemoryUsageKb = 0;
+        std::ifstream gpuUsageFile(std::filesystem::path(gpuCgroupDir) / containerName / "gpu.usage_in_bytes");
+        if (gpuUsageFile) {
+            gpuUsageFile >> gpuMemoryUsageKb;
+            gpuMemoryUsageKb /= (long double) 1024.0;
+        }
+
+        auto itr = mContainerMeasurements.find(containerName);
+
+        if (itr != mContainerMeasurements.end()) {
+            auto &measurement = itr->second;
+            measurement.MemoryUsed.AddDataPoint(memoryUsageKb);
+            measurement.CpuUsage      = static_cast<uint64_t>(cpuUsageNs);
+            measurement.CpuUsageUser  = static_cast<uint64_t>(cpuUsageUserNs);
+            measurement.CpuUsageSys   = static_cast<uint64_t>(cpuUsageSysNs);
+            measurement.SwapUsed      = static_cast<uint64_t>(swapUsageKb);
+            measurement.GpuMemoryUsed = static_cast<uint64_t>(gpuMemoryUsageKb);
+        } else {
+            Measurement memoryUsed("Memory_Used_KB");
+            memoryUsed.AddDataPoint(memoryUsageKb);
+
+            auto measurement = containerMeasurement(memoryUsed,
+                static_cast<uint64_t>(cpuUsageNs),
+                static_cast<uint64_t>(cpuUsageUserNs),
+                static_cast<uint64_t>(cpuUsageSysNs),
+                static_cast<uint64_t>(swapUsageKb),
+                static_cast<uint64_t>(gpuMemoryUsageKb));
+            mContainerMeasurements.insert(std::make_pair(containerName, measurement));
+        }
+    }
+}
+
+void MemoryMetric::GetSwapMemoryDetails()
+{
+    std::array<char, 256> buffer{};
+    std::string line;
+
+    FILE *pipe = popen("/usr/bin/free -k", "r");
+    if (!pipe) {
+        return;
+    }
+
+    long long totalKb = 0;
+    long long usedKb = 0;
+    long long freeKb = 0;
+    bool parsed = false;
+
+    while (fgets(buffer.data(), (int) buffer.size(), pipe) != nullptr) {
+        line = buffer.data();
+        if (sscanf(line.c_str(), "Swap: %lld %lld %lld", &totalKb, &usedKb, &freeKb) == 3) {
+            parsed = true;
+            break;
+        }
+    }
+
+    pclose(pipe);
+
+    if (parsed) {
+        mSwapDetailsSupported = true;
+        mSwapTotalKb = totalKb;
+        mSwapUsedKb = usedKb;
+        mSwapFreeKb = freeKb;
     }
 }
 

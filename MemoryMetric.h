@@ -21,6 +21,7 @@
 
 #include "IMetric.h"
 
+#include <cstdint>
 #include <thread>
 #include <condition_variable>
 #include <map>
@@ -55,6 +56,8 @@ private:
     void GetGpuMemoryUsage();
 
     void GetContainerMemoryUsage();
+
+    void GetSwapMemoryDetails();
 
     void GetMemoryBandwidth();
 
@@ -126,16 +129,42 @@ private:
     std::map<std::string, cmaMeasurement> mCmaMeasurements;
     std::map<std::string, Measurement> mLinuxMemoryMeasurements;
     std::map<pid_t, gpuMeasurement> mGpuMeasurements;
-    std::map<std::string, Measurement> mContainerMeasurements;
+    struct containerMeasurement
+    {
+        containerMeasurement(Measurement &_memoryUsed, uint64_t _cpuUsage, uint64_t _cpuUsageUser,
+                             uint64_t _cpuUsageSys, uint64_t _swapUsed,
+                             uint64_t _gpuMemoryUsed)
+                : MemoryUsed(std::move(_memoryUsed)),
+                  CpuUsage(_cpuUsage),
+                  CpuUsageUser(_cpuUsageUser),
+                  CpuUsageSys(_cpuUsageSys),
+                  SwapUsed(_swapUsed),
+                  GpuMemoryUsed(_gpuMemoryUsed)
+        {
+
+        }
+
+        Measurement MemoryUsed;
+        uint64_t CpuUsage;
+        uint64_t CpuUsageUser;
+        uint64_t CpuUsageSys;
+        uint64_t SwapUsed;
+        uint64_t GpuMemoryUsed;
+    };
+    std::map<std::string, containerMeasurement> mContainerMeasurements;
 
     std::map<std::string, Measurement> mBroadcomBmemMeasurements;
 
     Measurement mCmaFree;
     Measurement mCmaBorrowed;
+    long long mSwapTotalKb;
+    long long mSwapUsedKb;
+    long long mSwapFreeKb;
     Measurement mMemoryBandwidth;
 
     bool mMemoryBandwidthSupported;
     bool mGPUMemorySupported;
+    bool mSwapDetailsSupported;
 
     // Position in vector reflects order
     std::map<std::string, std::vector<memoryFragmentation>> mMemoryFragmentation;
