@@ -72,8 +72,6 @@ private:
     
     void GetGpuMemoryUsageMediatek();
 
-    void GetGpuMemoryUsageMediatek();
-
     void GetGpuMemoryUsageRealtek();
 
     pid_t tidToParentPid(pid_t tid);
