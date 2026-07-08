@@ -60,7 +60,13 @@ Row encoding rules:
   - `row[measurementName].Min`
   - `row[measurementName].Max`
   - `row[measurementName].Average`
+- `_columnOrder` emits flattened labels for measurement columns using `<measurementName> (Min)`, `<measurementName> (Max)`, `<measurementName> (Average)`.
 (`JsonReportGenerator.cpp:61` through `JsonReportGenerator.cpp:76`)
+
+Shape distinction for JSON consumers:
+
+- `processes[]` measurement objects use lowercase keys from `Measurement::ToJson()`: `{ min, max, average }`.
+- `data[]` dataset row measurements use capitalized keys: `{ Min, Max, Average }`, and `_columnOrder` uses labeled headers (`<name> (Min|Max|Average)`).
 
 ## pssByGroup[] Item
 
