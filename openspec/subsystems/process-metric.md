@@ -4,7 +4,7 @@
 
 ### Facts - Responsibilities
 
-- `ProcessMetric` periodically snapshots all running processes through `Procrank::GetMemoryUsage()` (`ProcessMetric.cpp:80`, `Procrank.cpp:48`).
+- `ProcessMetric` periodically snapshots all running processes through `Procrank::GetMemoryUsage()` (`ProcessMetric.cpp:85`, `Procrank.cpp:48`).
 - For each process, it accumulates `Pss`, `Rss`, `Uss`, `Vss`, `Swap`, `SwapPss`, `SwapZram`, `Locked` in `processMeasurement` (`ProcessMetric.cpp:94` onward, `ProcessMeasurement.h`).
 - On save, it deduplicates dead repeated command invocations and sends results to report generator (`ProcessMetric.cpp:58`, `ProcessMetric.cpp:145`).
 
@@ -14,7 +14,7 @@
 
 - Procrank enumerates numeric `/proc` entries and constructs `Process` objects (`Procrank.cpp:138`, `Procrank.cpp:60`).
 - Per process memory is derived from `Smaps` parser (`Procrank.cpp:165`).
-- `swap_zram` is computed from `swap_pss * zramCompressionRatio` (`Procrank.cpp:174`).
+- `swap_zram` is computed from `swap_pss * zramCompressionRatio` (`Procrank.cpp:177`).
 
 ### Inferences - Procrank
 

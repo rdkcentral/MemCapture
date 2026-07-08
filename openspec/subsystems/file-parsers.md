@@ -5,7 +5,7 @@
 ### Facts - MemInfo
 
 - Reads `/proc/meminfo` line-by-line and parses `MemTotal`, `MemFree`, `MemAvailable`, `Buffers`, `Cached`, `Slab`, `SReclaimable`, `SUnreclaim`, `SwapTotal`, `SwapFree`, `CmaTotal` (`FileParsers/MemInfo.cpp:31`).
-- Calculates `MemUsed` as `MemTotal - (MemFree + Buffers + Cached + SReclaimable)` (`FileParsers/MemInfo.cpp:76`).
+- Calculates `MemUsed` as `MemTotal - (MemFree + Buffers + Cached + SReclaimable)` (`FileParsers/MemInfo.cpp:72`).
 - Exposes methods consumed by `MemoryMetric::GetLinuxMemoryUsage` (`MemoryMetric.cpp:381` onward).
 
 ### Inferences - MemInfo
