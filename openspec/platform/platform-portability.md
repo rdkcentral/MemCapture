@@ -5,7 +5,8 @@
 ### Facts - Enum and CLI Mapping
 
 - Enum values: `AMLOGIC`, `AMLOGIC_950D4`, `REALTEK`, `REALTEK64`, `BROADCOM`, `MEDIATEK` (`Platform.h:22`).
-- CLI parser maps exact strings to those enum values and exits on unknown string (`main.cpp:116` through `main.cpp:131`).
+- CLI parser maps exact strings to those enum values; unknown strings emit `fprintf(stderr, ...)` warnings and continue using default platform behavior (`main.cpp:116` through `main.cpp:131`).
+- CLI parse/validation paths use `exit(...)` and `fprintf(stderr, ...)` in `parseArgs` for help/errors; logger macros are not used inside argument parsing (`main.cpp:78` through `main.cpp:166`).
 
 ## Universal vs Platform-Specific Metrics
 

@@ -1,5 +1,9 @@
 ---
 description: Enter explore mode - think through ideas, investigate problems, clarify requirements
+license: MIT
+attribution:
+   source: OpenSpec Fision AI
+   note: Adapted for MemCapture repository workflows.
 ---
 
 Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.

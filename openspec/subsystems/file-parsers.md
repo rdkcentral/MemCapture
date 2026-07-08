@@ -26,6 +26,6 @@
 
 ### Relationship to Measurement
 
-### Facts - Relationship to Measurement
+#### Facts
 
 - Smaps does not aggregate min/max/average itself; it provides snapshot values to Procrank, which are later accumulated by `Measurement` in `ProcessMetric`.

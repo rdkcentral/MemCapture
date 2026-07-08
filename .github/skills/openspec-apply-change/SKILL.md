@@ -7,6 +7,8 @@ metadata:
   author: openspec
   version: "1.0"
   generatedBy: "1.3.1"
+   attributionSource: "OpenSpec Fision AI"
+   attributionNote: "Adapted for MemCapture repository workflows"
 ---
 
 Implement tasks from an OpenSpec change.

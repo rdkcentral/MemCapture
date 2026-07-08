@@ -1,5 +1,9 @@
 ---
 description: Implement tasks from an OpenSpec change (Experimental)
+license: MIT
+attribution:
+   source: OpenSpec Fision AI
+   note: Adapted for MemCapture repository workflows.
 ---
 
 Implement tasks from an OpenSpec change.
