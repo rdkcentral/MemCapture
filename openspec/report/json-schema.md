@@ -26,7 +26,7 @@ Fields emitted in `getJson()`:
 - `platform`
 - `mac`
 - `timestamp`
-- `duration`
+- `duration` (seconds)
 - `swapEnabled`
 (`JsonReportGenerator.cpp:95` through `JsonReportGenerator.cpp:101`)
 
@@ -38,6 +38,7 @@ Each process object contains:
 
 - Identity and labels: `pid`, `ppid`, `name`, `cmdline`, `systemdService`, `container`, `group`
 - Measurements: `rss`, `pss`, `uss`, `vss`, `swap`, `swapPss`, `swapZram`, `locked`
+- Units: process measurement values are in `kB` (sourced from smaps/smaps_rollup parsing and carried through `Procrank` + `Measurement` serialization without unit conversion), while `grandTotal.linuxUsage` and `grandTotal.calculatedUsage` are stored in `MB` (`FileParsers/Smaps.cpp:157` through `FileParsers/Smaps.cpp:180`, `Procrank.cpp:170` through `Procrank.cpp:177`, `Measurement.cpp:92` through `Measurement.cpp:98`, `JsonReportGenerator.cpp:186` through `JsonReportGenerator.cpp:199`).
 
 Each measurement object shape is `{ min, max, average }` from `Measurement::ToJson()`.
 (See `JsonReportGenerator.cpp:112` through `JsonReportGenerator.cpp:133`, `Measurement.cpp:92`.)
