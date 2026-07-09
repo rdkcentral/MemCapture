@@ -47,7 +47,7 @@ classDiagram
       -bool mQuit
       -Platform mPlatform
       -shared_ptr~JsonReportGenerator~ mReportGenerator
-      -map metrics/containers/gpu/cma
+      -map~string, cmaMeasurement~ mCmaMeasurements
     }
 
     class CpuIdleMetric {

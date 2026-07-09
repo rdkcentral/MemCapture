@@ -6,8 +6,8 @@ All keys below are emitted from `JsonReportGenerator` and `main` flow.
 
 ### Facts - Top-Level
 
-- `processes` (array): initialized empty; populated by `addProcesses` (`JsonReportGenerator.cpp:29`, `JsonReportGenerator.cpp:106`).
-- `metadata` (object): populated in `getJson()` (`JsonReportGenerator.cpp:30`, `JsonReportGenerator.cpp:92`).
+- `processes` (array): initialized empty; populated by `addProcesses` (`JsonReportGenerator.cpp:30`, `JsonReportGenerator.cpp:106`).
+- `metadata` (object): populated in `getJson()` (`JsonReportGenerator.cpp:31`, `JsonReportGenerator.cpp:92`).
 - `cpuIdleStats` (object or null): initialized null; populated by `addCpuIdleMetrics` when enabled (`JsonReportGenerator.cpp:32`, `JsonReportGenerator.cpp:202`).
 - `grandTotal` (object):
   - `linuxUsage` (number MB)
