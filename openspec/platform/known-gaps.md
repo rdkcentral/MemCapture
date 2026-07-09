@@ -3,7 +3,7 @@
 ## Facts (directly observed)
 
 - README runtime section lists only three platforms (`AMLOGIC`, `REALTEK`, `BROADCOM`), while code supports six (`AMLOGIC_950D4`, `REALTEK64`, `MEDIATEK` additionally) (`README.md:40`, `main.cpp:116` to `main.cpp:128`).
-- README says optional JSON filename `results.json`; code writes `report.json` (`README.md:80`, `main.cpp:330`).
+- README says optional JSON filename `results.json`; code writes `report.json` (`README.md:85`, `main.cpp:330`).
 - `MemInfo` exposes `CmaFree()` but parser never sets `mCmaFree`; only `CmaTotal` is parsed (`FileParsers/MemInfo.cpp:31` onward, `MemInfo.h`).
 - `main` duration validation checks `< 0` while error text says must be `> 0`, allowing `0` duration captures (`main.cpp:108`).
 
