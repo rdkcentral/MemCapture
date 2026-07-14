@@ -1,0 +1,30 @@
+schema: spec-driven
+
+context: |
+  Repository: MemCapture memory telemetry tool for embedded Linux/RDK devices.
+  Language and standard: C++17.
+  Build: CMake 3.10+, vcpkg for desktop, Yocto for device builds.
+  Runtime model: one-shot capture window, per-metric collection, JSON and HTML report output.
+  Primary binary: MemCapture (single executable).
+  Core components: IMetric implementations (MemoryMetric, ProcessMetric, optional CpuIdleMetric), FileParsers, Procrank, JsonReportGenerator.
+  Supported platforms: AMLOGIC, AMLOGIC_950D4, REALTEK, REALTEK64, BROADCOM, MEDIATEK.
+  Constraints: low runtime overhead on resource-constrained devices; preserve report schema compatibility.
+  Documentation baseline: openspec/project.md and supporting docs under openspec/.
+  Attribution references: OpenSpec and OpenSpec Fision AI derived workflow artifacts.
+
+rules:
+  proposal:
+    - Ground every requirement in code-truth and include explicit non-goals.
+    - Call out platform impact and schema impact for any change.
+    - Include deployment and validation scope for embedded/Yocto targets.
+  design:
+    - Separate Facts, Inferences, Assumptions, and Unknowns.
+    - Include threading/lifecycle impact and data-flow impact.
+    - Include platform portability notes for AMLOGIC/REALTEK/BROADCOM/MEDIATEK.
+  specs:
+    - Preserve backward compatibility of existing report.json keys unless explicitly changing schema.
+    - Define acceptance criteria with measurable outcomes and target files/symbols.
+  tasks:
+    - Break work into small, testable tasks with explicit validation steps.
+    - Include at least one task for device/platform validation when platform-specific code changes.
+    - Include regression checks for JSON output and report rendering.
