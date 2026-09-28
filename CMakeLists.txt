@@ -84,3 +84,8 @@ option(ENABLE_CPU_IDLE_METRICS "Enable support for kernel-based AV metrics on su
 if (ENABLE_CPU_IDLE_METRICS)
     add_definitions(-DENABLE_CPU_IDLE_METRICS=1)
 endif ()
+
+option(BUILD_TESTS "Build security regression tests" OFF)
+if (BUILD_TESTS)
+    add_subdirectory(tests)
+endif ()
