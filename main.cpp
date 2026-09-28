@@ -23,9 +23,12 @@
 #include <fstream>
 #include <optional>
 #include <filesystem>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include "Platform.h"
 #include "Log.h"
+#include "SafeFileOps.h"
 #include "ProcessMetric.h"
 #include "MemoryMetric.h"
 #include "Metadata.h"
@@ -198,11 +201,12 @@ int main(int argc, char *argv[])
         LOG_WARN("Failed to set nice value");
     }
 
-    try {
-        std::filesystem::create_directories(gOutputDirectory);
-    } catch (std::filesystem::filesystem_error &e) {
-        LOG_ERROR("Failed to create directory %s to save results in: '%s'", gOutputDirectory.string().c_str(),
-                  e.what());
+    // Validate the output directory path before any filesystem operations
+    if (!validateOutputDirectory(gOutputDirectory)) {
+        return EXIT_FAILURE;
+    }
+
+    if (!createOutputDirectorySafe(gOutputDirectory)) {
         return EXIT_FAILURE;
     }
 
@@ -328,9 +332,18 @@ int main(int argc, char *argv[])
     // after this point we'll still get some data
     if (gJson) {
         std::filesystem::path jsonFilepath = gOutputDirectory / "report.json";
-        std::ofstream outputJson(jsonFilepath, std::ios::trunc | std::ios::binary);
-        outputJson << reportGenerator->getJson().dump(4);
-
+        int jsonFd = safeOpenForWrite(jsonFilepath);
+        if (jsonFd < 0) {
+            LOG_ERROR("Failed to safely open %s for writing", jsonFilepath.string().c_str());
+            return EXIT_FAILURE;
+        }
+        std::string jsonData = reportGenerator->getJson().dump(4);
+        if (!writeToFd(jsonFd, jsonData)) {
+            LOG_ERROR("Failed to write JSON data to %s", jsonFilepath.string().c_str());
+            close(jsonFd);
+            return EXIT_FAILURE;
+        }
+        close(jsonFd);
         LOG_INFO("Saved JSON data to %s", jsonFilepath.string().c_str());
     }
 
@@ -339,9 +352,17 @@ int main(int argc, char *argv[])
         std::string result = env.render(htmlTemplateString, reportGenerator->getJson());
 
         std::filesystem::path htmlFilepath = gOutputDirectory / "report.html";
-        std::ofstream outputHtml(htmlFilepath, std::ios::trunc | std::ios::binary);
-        outputHtml << result;
-
+        int htmlFd = safeOpenForWrite(htmlFilepath);
+        if (htmlFd < 0) {
+            LOG_ERROR("Failed to safely open %s for writing", htmlFilepath.string().c_str());
+            return EXIT_FAILURE;
+        }
+        if (!writeToFd(htmlFd, result)) {
+            LOG_ERROR("Failed to write HTML report to %s", htmlFilepath.string().c_str());
+            close(htmlFd);
+            return EXIT_FAILURE;
+        }
+        close(htmlFd);
         LOG_INFO("Saved report to %s", htmlFilepath.string().c_str());
     } catch (const std::exception &e) {
         LOG_ERROR("Failed to save HTML report with exception %s", e.what());
