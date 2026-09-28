@@ -324,6 +324,41 @@ int main(int argc, char *argv[])
         return ordered;
     });
 
+    // Escape a string for safe embedding in a JavaScript single-quoted string literal.
+    // Prevents XSS by escaping backslash, single quote, </script> breakout sequences,
+    // and control characters.
+    env.add_callback("jsEscape", 1, [](inja::Arguments &args)
+    {
+        std::string input = args.at(0)->get<std::string>();
+        std::string escaped;
+        escaped.reserve(input.size() + input.size() / 4);
+
+        for (char c : input) {
+            switch (c) {
+                case '\\': escaped += "\\\\"; break;
+                case '\'': escaped += "\\'"; break;
+                case '"':  escaped += "\\\""; break;
+                case '<':  escaped += "\\x3c"; break;
+                case '>':  escaped += "\\x3e"; break;
+                case '/':  escaped += "\\/"; break;
+                case '\n': escaped += "\\n"; break;
+                case '\r': escaped += "\\r"; break;
+                case '\0': escaped += "\\0"; break;
+                default:
+                    if (static_cast<unsigned char>(c) < 0x20) {
+                        char buf[8];
+                        snprintf(buf, sizeof(buf), "\\x%02x", static_cast<unsigned char>(c));
+                        escaped += buf;
+                    } else {
+                        escaped += c;
+                    }
+                    break;
+            }
+        }
+
+        return escaped;
+    });
+
     // Write the JSON first - this is safer and is the report automation need, so if we crash
     // after this point we'll still get some data
     if (gJson) {

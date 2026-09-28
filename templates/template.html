@@ -440,7 +440,7 @@
         data: {
             labels: [
                 {% for i in range(20) %}
-                    '{{ at(processes, i).name }}',
+                    '{{ jsEscape(at(processes, i).name) }}',
                 {% endfor %}
              ],
             datasets: [{
@@ -470,7 +470,7 @@
             data: {
                 labels: [
                     {% for g in pssByGroup %}
-                        '{{ g.groupName }}',
+                        '{{ jsEscape(g.groupName) }}',
                     {% endfor %}
                  ],
                 datasets: [{
