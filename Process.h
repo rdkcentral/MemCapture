@@ -36,7 +36,7 @@
 class Process
 {
 public:
-    explicit Process(pid_t pid);
+    explicit Process(pid_t pid, std::string::size_type maxStoredStringLength = std::string::npos);
 
     bool operator==(const Process &rhs) const
     {
@@ -65,9 +65,9 @@ public:
 private:
     pid_t getParentPid() const;
 
-    std::string getName() const;
+    std::string getName(std::string::size_type maxLength) const;
 
-    std::string getCmdline() const;
+    std::string getCmdline(std::string::size_type maxLength) const;
 
     std::string getSystemdService();
 
@@ -76,6 +76,37 @@ private:
     std::string getNameWithoutPath() const;
 
     std::string GetCgroupPathByCgroupControllerAndPid(const std::string &cgroup_controller, pid_t pid);
+
+    // UTF-8 boundary-aware string truncation helpers
+    static bool isUtf8CharacterStart(unsigned char byte)
+    {
+        // UTF-8: single-byte (0xxxxxxx) or multi-byte start (11xxxxxx)
+        // NOT continuation byte (10xxxxxx)
+        return (byte & 0xC0) != 0x80;
+    }
+
+    static void resizeToUtf8Boundary(std::string &str, std::string::size_type maxLength)
+    {
+        if (str.size() > maxLength) {
+            str.resize(maxLength);
+        }
+        if (str.empty()) {
+            return;
+        }
+        auto pos = str.size() - 1;
+        while (pos > 0 && !isUtf8CharacterStart(static_cast<unsigned char>(str[pos]))) {
+            --pos;
+        }
+        const auto lead = static_cast<unsigned char>(str[pos]);
+        const std::string::size_type expectedLength =
+            lead < 0x80 ? 1 :
+            (lead & 0xE0) == 0xC0 ? 2 :
+            (lead & 0xF0) == 0xE0 ? 3 :
+            (lead & 0xF8) == 0xF0 ? 4 : 1;
+        if (str.size() - pos < expectedLength) {
+            str.resize(pos);
+        }
+    }
 
 private:
     pid_t mPid;
